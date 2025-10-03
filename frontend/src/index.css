@@ -1,0 +1,23 @@
+/* index.css — basic reset + simple page styling */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html,body,#root {
+  height: 100%;
+  font-family: Inter, Roboto, "Segoe UI", Arial, sans-serif;
+  background: #f7f9fc;
+  color: #111827;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+  color: #0f172a;
+}
+
+.app-container {
+  max-width: 1000px;
+  margin: 24px auto;
+  padding: 20px;
+}
+
+p { color: #475569; }

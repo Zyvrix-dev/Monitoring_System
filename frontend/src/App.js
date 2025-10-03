@@ -6,20 +6,19 @@ function App() {
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:9002');
-
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       setMetrics(prev => [...prev.slice(-29), { ...data, time: new Date().toLocaleTimeString() }]);
     };
+    ws.onopen = () => console.log('WS open');
+    ws.onclose = () => console.log('WS closed');
     return () => ws.close();
   }, []);
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Server Monitoring Dashboard</h1>
+    <div style={{ padding: 20 }}>
+      <h1>Monitoring Dashboard</h1>
       <MetricChart data={metrics} />
-      <p>Live metrics via WebSocket from C++ backend</p>
-      <p>Historical metrics available in Grafana at <a href="http://localhost:3001" target="_blank">Grafana</a></p>
     </div>
   );
 }

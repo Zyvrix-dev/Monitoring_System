@@ -1,24 +1,25 @@
 #pragma once
-#include <boost/asio.hpp>
-#include <boost/beast.hpp>
 #include <thread>
 #include "system_metrics.h"
 
-namespace beast = boost::beast;
-namespace websocket = beast::websocket;
-namespace net = boost::asio;
-using tcp = net::ip::tcp;
+// Forward-declare Boost types to keep header lightweight.
+namespace boost {
+namespace asio {
+namespace ip {
+class tcp;
+} // ip
+} // asio
+} // boost
 
-class WebSocketServer
-{
+class WebSocketServer {
 public:
-    WebSocketServer(unsigned short port);
+    explicit WebSocketServer(unsigned short port);
     void run();
-
 private:
-    net::io_context ioc;
-    tcp::acceptor acceptor_;
-    MetricsCollector collector;
+    // io_context and acceptor are declared in implementation (.cpp)
+    SystemMetrics collect_once(); // helper to call collector from .cpp
     void do_accept();
-    void handle_session(tcp::socket socket);
+    void handle_session(/* socket type hidden */ void* socket_placeholder);
+    MetricsCollector collector;
+    unsigned short port_;
 };

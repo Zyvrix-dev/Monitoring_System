@@ -1,0 +1,3 @@
+/mnt/c/Users/pasan/OneDrive/Desktop/Built-By-Pasan/monitoring_system_full/backend/build/CMakeFiles/cpp_monitor.dir
+/mnt/c/Users/pasan/OneDrive/Desktop/Built-By-Pasan/monitoring_system_full/backend/build/CMakeFiles/edit_cache.dir
+/mnt/c/Users/pasan/OneDrive/Desktop/Built-By-Pasan/monitoring_system_full/backend/build/CMakeFiles/rebuild_cache.dir
