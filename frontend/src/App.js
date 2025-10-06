@@ -1,24 +1,414 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MetricChart from './components/MetricChart';
+import ConnectionsChart from './components/ConnectionsChart';
+import MetricCard from './components/MetricCard';
+import StatusTimeline from './components/StatusTimeline';
+
+const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:9002';
+const MAX_DATA_POINTS = 180; // keep three minutes of second-level data
+
+const formatPercent = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return '--';
+  }
+  return value.toFixed(1);
+};
+
+const formatPercentLabel = (value) => {
+  const base = formatPercent(value);
+  return base === '--' ? '--' : `${base}%`;
+};
+
+const formatConnections = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '--';
+  }
+  return Number(value).toLocaleString();
+};
+
+const determineHealth = (metric) => {
+  if (!metric) {
+    return 'unknown';
+  }
+
+  const cpu = Number(metric.cpu) || 0;
+  const memory = Number(metric.memory) || 0;
+  const connections = Number(metric.connections) || 0;
+
+  if (cpu >= 90 || memory >= 92 || connections >= 2000) {
+    return 'critical';
+  }
+
+  if (cpu >= 75 || memory >= 82 || connections >= 1200) {
+    return 'warning';
+  }
+
+  return 'healthy';
+};
+
+const STATUS_DESCRIPTIONS = {
+  healthy: 'All services are performing within the expected ranges.',
+  warning: 'Resource utilisation is trending high – keep an eye on the load.',
+  critical: 'Immediate attention required. Investigate the affected nodes.',
+  unknown: 'Awaiting live telemetry from the monitoring agents.'
+};
+
+const connectionLabel = {
+  connecting: 'Connecting…',
+  connected: 'Live connection',
+  disconnected: 'Reconnecting…'
+};
+
+const healthLabel = {
+  healthy: 'Healthy',
+  warning: 'Warning',
+  critical: 'Critical',
+  unknown: 'Offline'
+};
+
+const createStatusEvent = (status, metric) => {
+  const time = new Date(metric.timestamp || Date.now());
+  const formattedTime = time.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  const description = `CPU ${formatPercent(metric.cpu)}%, Memory ${formatPercent(metric.memory)}%, Connections ${formatConnections(metric.connections)}`;
+
+  return {
+    id: `${status}-${metric.timestamp || time.getTime()}`,
+    status,
+    title: healthLabel[status],
+    description,
+    details: STATUS_DESCRIPTIONS[status],
+    timeLabel: formattedTime
+  };
+};
 
 function App() {
   const [metrics, setMetrics] = useState([]);
+  const [connectionState, setConnectionState] = useState('connecting');
+  const [statusEvents, setStatusEvents] = useState([]);
+  const previousHealth = useRef('unknown');
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:9002');
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setMetrics(prev => [...prev.slice(-29), { ...data, time: new Date().toLocaleTimeString() }]);
+    let ws;
+    let reconnectTimer;
+    let cancelled = false;
+
+    const connect = () => {
+      if (cancelled) {
+        return;
+      }
+
+      setConnectionState('connecting');
+
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        if (!cancelled) {
+          setConnectionState('connected');
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const now = new Date();
+          const metric = {
+            cpu: Number(payload.cpu ?? payload.cpuUsage ?? 0),
+            memory: Number(payload.memory ?? payload.memoryUsage ?? 0),
+            connections: Number(payload.connections ?? payload.activeConnections ?? 0),
+            time: now.toLocaleTimeString([], {
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }),
+            timestamp: now.toISOString()
+          };
+
+          setMetrics((previous) => {
+            const next = [...previous, metric];
+            if (next.length > MAX_DATA_POINTS) {
+              next.shift();
+            }
+            return next;
+          });
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to parse metric payload', error);
+        }
+      };
+
+      ws.onclose = () => {
+        if (cancelled) {
+          return;
+        }
+
+        setConnectionState('disconnected');
+        reconnectTimer = setTimeout(connect, 4000);
+      };
+
+      ws.onerror = () => {
+        if (ws && ws.readyState !== WebSocket.CLOSING) {
+          ws.close();
+        }
+      };
     };
-    ws.onopen = () => console.log('WS open');
-    ws.onclose = () => console.log('WS closed');
-    return () => ws.close();
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      }
+    };
   }, []);
 
+  const latestMetric = metrics.length ? metrics[metrics.length - 1] : undefined;
+  const previousMetric =
+    metrics.length > 1 ? metrics[metrics.length - 2] : undefined;
+
+  useEffect(() => {
+    if (!latestMetric) {
+      return;
+    }
+
+    const health = determineHealth(latestMetric);
+
+    if (previousHealth.current !== health) {
+      const event = createStatusEvent(health, latestMetric);
+      setStatusEvents((prev) => [event, ...prev].slice(0, 10));
+      previousHealth.current = health;
+    }
+  }, [latestMetric]);
+
+  const health = determineHealth(latestMetric);
+
+  const stats = useMemo(() => {
+    if (!metrics.length) {
+      return {
+        cpu: { avg: null, peak: null, min: null },
+        memory: { avg: null, peak: null, min: null },
+        connections: { avg: null, peak: null, min: null }
+      };
+    }
+
+    const calculate = (key) => {
+      const values = metrics
+        .map((item) => Number(item[key]))
+        .filter((value) => Number.isFinite(value));
+
+      if (!values.length) {
+        return { avg: null, peak: null, min: null };
+      }
+
+      const sum = values.reduce((total, value) => total + value, 0);
+      return {
+        avg: sum / values.length,
+        peak: Math.max(...values),
+        min: Math.min(...values)
+      };
+    };
+
+    return {
+      cpu: calculate('cpu'),
+      memory: calculate('memory'),
+      connections: calculate('connections')
+    };
+  }, [metrics]);
+
+  const buildTrend = (key, unitSuffix) => {
+    if (!latestMetric || !previousMetric) {
+      return null;
+    }
+
+    const latestValue = Number(latestMetric[key]);
+    const previousValue = Number(previousMetric[key]);
+
+    if (!Number.isFinite(latestValue) || !Number.isFinite(previousValue)) {
+      return null;
+    }
+
+    const delta = latestValue - previousValue;
+    const threshold = unitSuffix === '%' ? 0.1 : 1;
+    const direction = Math.abs(delta) < threshold ? 'steady' : delta > 0 ? 'up' : 'down';
+
+    if (direction === 'steady') {
+      return {
+        direction: 'steady',
+        label: 'Stable vs last sample'
+      };
+    }
+
+    const symbol = delta > 0 ? '+' : '-';
+    const formattedDelta =
+      unitSuffix === '%'
+        ? Math.abs(delta).toFixed(1)
+        : Math.round(Math.abs(delta)).toLocaleString();
+
+    return {
+      direction,
+      label: `${symbol}${formattedDelta}${unitSuffix} vs last sample`
+    };
+  };
+
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Monitoring Dashboard</h1>
-      <MetricChart data={metrics} />
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header__titles">
+          <p className="app-eyebrow">Observability Control Centre</p>
+          <h1>Realtime Infrastructure Overview</h1>
+          <p className="app-subtitle">
+            Unified insights for system health, utilisation and client connectivity.
+          </p>
+        </div>
+        <div className="app-header__status">
+          <span className={`status-pill status-pill--${connectionState}`}>
+            <span className="status-indicator" aria-hidden="true" />
+            {connectionLabel[connectionState]}
+          </span>
+          <span className={`status-pill status-pill--${health}`}>
+            <span className="status-indicator" aria-hidden="true" />
+            {healthLabel[health]}
+          </span>
+        </div>
+      </header>
+
+      <main className="app-main">
+        <section className="kpi-grid" aria-label="Key metrics">
+          <MetricCard
+            title="CPU utilisation"
+            value={formatPercent(latestMetric?.cpu)}
+            unit="%"
+            status={health}
+            trend={buildTrend('cpu', '%')}
+            helper={
+              stats.cpu.avg !== null
+                ? `Avg ${formatPercent(stats.cpu.avg)}% • Peak ${formatPercent(stats.cpu.peak)}%`
+                : 'Waiting for samples'
+            }
+          />
+          <MetricCard
+            title="Memory usage"
+            value={formatPercent(latestMetric?.memory)}
+            unit="%"
+            status={health}
+            trend={buildTrend('memory', '%')}
+            helper={
+              stats.memory.avg !== null
+                ? `Avg ${formatPercent(stats.memory.avg)}% • Peak ${formatPercent(stats.memory.peak)}%`
+                : 'Waiting for samples'
+            }
+          />
+          <MetricCard
+            title="Active connections"
+            value={formatConnections(latestMetric?.connections)}
+            status={health}
+            unit=""
+            trend={buildTrend('connections', '')}
+            helper={
+              stats.connections.avg !== null
+                ? `Avg ${Math.round(stats.connections.avg).toLocaleString()} • Peak ${Math.round(stats.connections.peak).toLocaleString()}`
+                : 'Waiting for samples'
+            }
+          />
+        </section>
+
+        <section className="panel-grid" aria-label="Charts">
+          <article className="panel panel--primary">
+            <div className="panel__header">
+              <div>
+                <h2>Resource utilisation</h2>
+                <p>CPU and memory saturation sampled each second.</p>
+              </div>
+              <span className="panel__tag">Live</span>
+            </div>
+            <MetricChart data={metrics} />
+          </article>
+
+          <article className="panel">
+            <div className="panel__header">
+              <div>
+                <h2>Connection load</h2>
+                <p>Client connections observed over time.</p>
+              </div>
+            </div>
+            <ConnectionsChart data={metrics} />
+          </article>
+        </section>
+
+        <section className="panel-grid panel-grid--balanced" aria-label="Operational insights">
+          <article className="panel">
+            <div className="panel__header">
+              <div>
+                <h2>Health timeline</h2>
+                <p>Key state changes recorded during this session.</p>
+              </div>
+            </div>
+            <StatusTimeline events={statusEvents} />
+          </article>
+
+          <article className="panel">
+            <div className="panel__header">
+              <div>
+                <h2>Performance summary</h2>
+                <p>Aggregates calculated from the active session.</p>
+              </div>
+            </div>
+            <div className="insights">
+              <table className="insights-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Metric</th>
+                    <th scope="col">Current</th>
+                    <th scope="col">Average</th>
+                    <th scope="col">Peak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">CPU</th>
+                    <td>{formatPercentLabel(latestMetric?.cpu)}</td>
+                    <td>{stats.cpu.avg !== null ? formatPercentLabel(stats.cpu.avg) : '--'}</td>
+                    <td>{stats.cpu.peak !== null ? formatPercentLabel(stats.cpu.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Memory</th>
+                    <td>{formatPercentLabel(latestMetric?.memory)}</td>
+                    <td>{stats.memory.avg !== null ? formatPercentLabel(stats.memory.avg) : '--'}</td>
+                    <td>{stats.memory.peak !== null ? formatPercentLabel(stats.memory.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Connections</th>
+                    <td>{formatConnections(latestMetric?.connections)}</td>
+                    <td>
+                      {stats.connections.avg !== null
+                        ? formatConnections(Math.round(stats.connections.avg))
+                        : '--'}
+                    </td>
+                    <td>
+                      {stats.connections.peak !== null
+                        ? formatConnections(Math.round(stats.connections.peak))
+                        : '--'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </main>
+
+      <footer className="app-footer">
+        <p>Monitoring System · Ready for launch</p>
+      </footer>
     </div>
   );
 }
