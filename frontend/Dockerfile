@@ -5,7 +5,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY . .
+COPY public ./public
+COPY src ./src
+
+RUN test -f public/index.html
 
 ENV HOST=0.0.0.0
 
