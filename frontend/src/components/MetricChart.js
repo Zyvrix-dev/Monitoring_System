@@ -53,6 +53,15 @@ function MetricChart({ data }) {
             isAnimationActive={false}
             name="Memory %"
           />
+          <Line
+            type="monotone"
+            dataKey="disk"
+            stroke="var(--chart-purple)"
+            strokeWidth={2.4}
+            dot={false}
+            isAnimationActive={false}
+            name="Disk %"
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

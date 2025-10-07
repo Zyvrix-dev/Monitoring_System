@@ -5,7 +5,24 @@ import MetricCard from './components/MetricCard';
 import StatusTimeline from './components/StatusTimeline';
 
 const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:9002';
+const API_TOKEN = process.env.REACT_APP_API_TOKEN || '';
 const MAX_DATA_POINTS = 180; // keep three minutes of second-level data
+
+const buildWebSocketUrl = () => {
+  try {
+    const url = new URL(WS_URL);
+    if (API_TOKEN) {
+      url.searchParams.set('token', API_TOKEN);
+    }
+    return url.toString();
+  } catch (error) {
+    if (!API_TOKEN) {
+      return WS_URL;
+    }
+    const separator = WS_URL.includes('?') ? '&' : '?';
+    return `${WS_URL}${separator}token=${encodeURIComponent(API_TOKEN)}`;
+  }
+};
 
 const formatPercent = (value) => {
   if (value === null || value === undefined || Number.isNaN(value)) {
@@ -26,6 +43,56 @@ const formatConnections = (value) => {
   return Number(value).toLocaleString();
 };
 
+const formatLoad = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+  return numeric.toFixed(2);
+};
+
+const formatLoadPerCore = (value, cores) => {
+  const numeric = Number(value);
+  const coreCount = Math.max(Number(cores) || 0, 1);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+  return (numeric / coreCount).toFixed(2);
+};
+
+const formatThroughput = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+
+  const absValue = Math.abs(numeric);
+  if (absValue >= 1024 * 1024) {
+    return `${(numeric / (1024 * 1024)).toFixed(2)} GB/s`;
+  }
+  if (absValue >= 1024) {
+    return `${(numeric / 1024).toFixed(2)} MB/s`;
+  }
+  return `${numeric.toFixed(1)} KB/s`;
+};
+
+const formatThroughputPair = (inbound, outbound) => {
+  const down = formatThroughput(inbound);
+  const up = formatThroughput(outbound);
+  if (down === '--' && up === '--') {
+    return '--';
+  }
+  return `↓${down} • ↑${up}`;
+};
+
+const formatCpuCores = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return '--';
+  }
+  return numeric.toLocaleString();
+};
+
 const determineHealth = (metric) => {
   if (!metric) {
     return 'unknown';
@@ -33,13 +100,29 @@ const determineHealth = (metric) => {
 
   const cpu = Number(metric.cpu) || 0;
   const memory = Number(metric.memory) || 0;
+  const disk = Number(metric.disk) || 0;
   const connections = Number(metric.connections) || 0;
+  const load1 = Number(metric.load1) || 0;
+  const cores = Math.max(Number(metric.cpuCores) || 0, 1);
+  const normalizedLoad = load1 / cores;
 
-  if (cpu >= 90 || memory >= 92 || connections >= 2000) {
+  if (
+    cpu >= 90 ||
+    memory >= 92 ||
+    disk >= 93 ||
+    normalizedLoad >= 2 ||
+    connections >= 2000
+  ) {
     return 'critical';
   }
 
-  if (cpu >= 75 || memory >= 82 || connections >= 1200) {
+  if (
+    cpu >= 75 ||
+    memory >= 82 ||
+    disk >= 85 ||
+    normalizedLoad >= 1.2 ||
+    connections >= 1200
+  ) {
     return 'warning';
   }
 
@@ -74,7 +157,33 @@ const createStatusEvent = (status, metric) => {
     second: '2-digit'
   });
 
-  const description = `CPU ${formatPercent(metric.cpu)}%, Memory ${formatPercent(metric.memory)}%, Connections ${formatConnections(metric.connections)}`;
+  const pieces = [];
+  const cpuText = formatPercent(metric.cpu);
+  if (cpuText !== '--') {
+    pieces.push(`CPU ${cpuText}%`);
+  }
+  const memoryText = formatPercent(metric.memory);
+  if (memoryText !== '--') {
+    pieces.push(`Memory ${memoryText}%`);
+  }
+  const diskText = formatPercent(metric.disk);
+  if (diskText !== '--') {
+    pieces.push(`Disk ${diskText}%`);
+  }
+  const loadText = formatLoad(metric.load1);
+  if (loadText !== '--') {
+    pieces.push(`Load ${loadText} (1m)`);
+  }
+  const netText = formatThroughputPair(metric.netRx, metric.netTx);
+  if (netText !== '--') {
+    pieces.push(`Net ${netText}`);
+  }
+  const connectionText = formatConnections(metric.connections);
+  if (connectionText !== '--') {
+    pieces.push(`Connections ${connectionText}`);
+  }
+
+  const description = pieces.length ? pieces.join(', ') : 'No metrics reported';
 
   return {
     id: `${status}-${metric.timestamp || time.getTime()}`,
@@ -104,7 +213,7 @@ function App() {
 
       setConnectionState('connecting');
 
-      ws = new WebSocket(WS_URL);
+      ws = new WebSocket(buildWebSocketUrl());
 
       ws.onopen = () => {
         if (!cancelled) {
@@ -115,18 +224,29 @@ function App() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          const now = new Date();
+          const timestampIso = payload.timestamp || payload.time || new Date().toISOString();
+          let sampleDate = new Date(timestampIso);
+          if (Number.isNaN(sampleDate.getTime())) {
+            sampleDate = new Date();
+          }
           const metric = {
             cpu: Number(payload.cpu ?? payload.cpuUsage ?? 0),
             memory: Number(payload.memory ?? payload.memoryUsage ?? 0),
             connections: Number(payload.connections ?? payload.activeConnections ?? 0),
-            time: now.toLocaleTimeString([], {
+            disk: Number(payload.disk ?? payload.diskUsage ?? 0),
+            load1: Number(payload.load1 ?? payload.loadAverage1 ?? 0),
+            load5: Number(payload.load5 ?? payload.loadAverage5 ?? 0),
+            load15: Number(payload.load15 ?? payload.loadAverage15 ?? 0),
+            netRx: Number(payload.netRx ?? payload.networkReceiveRate ?? 0),
+            netTx: Number(payload.netTx ?? payload.networkTransmitRate ?? 0),
+            cpuCores: Number(payload.cpuCores ?? payload.cpuCount ?? 0),
+            time: sampleDate.toLocaleTimeString([], {
               hour12: false,
               hour: '2-digit',
               minute: '2-digit',
               second: '2-digit'
             }),
-            timestamp: now.toISOString()
+            timestamp: sampleDate.toISOString()
           };
 
           setMetrics((previous) => {
@@ -220,7 +340,13 @@ function App() {
     return {
       cpu: calculate('cpu'),
       memory: calculate('memory'),
-      connections: calculate('connections')
+      disk: calculate('disk'),
+      connections: calculate('connections'),
+      load1: calculate('load1'),
+      load5: calculate('load5'),
+      load15: calculate('load15'),
+      netRx: calculate('netRx'),
+      netTx: calculate('netTx')
     };
   }, [metrics]);
 
@@ -308,6 +434,18 @@ function App() {
             }
           />
           <MetricCard
+            title="Disk usage"
+            value={formatPercent(latestMetric?.disk)}
+            unit="%"
+            status={health}
+            trend={buildTrend('disk', '%')}
+            helper={
+              stats.disk?.avg !== null
+                ? `Avg ${formatPercent(stats.disk.avg)}% • Peak ${formatPercent(stats.disk.peak)}%`
+                : 'Waiting for samples'
+            }
+          />
+          <MetricCard
             title="Active connections"
             value={formatConnections(latestMetric?.connections)}
             status={health}
@@ -316,6 +454,18 @@ function App() {
             helper={
               stats.connections.avg !== null
                 ? `Avg ${Math.round(stats.connections.avg).toLocaleString()} • Peak ${Math.round(stats.connections.peak).toLocaleString()}`
+                : 'Waiting for samples'
+            }
+          />
+          <MetricCard
+            title="Network throughput"
+            value={formatThroughputPair(latestMetric?.netRx, latestMetric?.netTx)}
+            unit=""
+            status={health}
+            trend={null}
+            helper={
+              stats.netRx.avg !== null && stats.netTx.avg !== null
+                ? `Avg ↓${formatThroughput(stats.netRx.avg)} • ↑${formatThroughput(stats.netTx.avg)}`
                 : 'Waiting for samples'
             }
           />
@@ -399,8 +549,58 @@ function App() {
                         : '--'}
                     </td>
                   </tr>
+                  <tr>
+                    <th scope="row">Disk</th>
+                    <td>{formatPercentLabel(latestMetric?.disk)}</td>
+                    <td>{stats.disk?.avg !== null ? formatPercentLabel(stats.disk.avg) : '--'}</td>
+                    <td>{stats.disk?.peak !== null ? formatPercentLabel(stats.disk.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Network in</th>
+                    <td>{formatThroughput(latestMetric?.netRx)}</td>
+                    <td>{stats.netRx.avg !== null ? formatThroughput(stats.netRx.avg) : '--'}</td>
+                    <td>{stats.netRx.peak !== null ? formatThroughput(stats.netRx.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Network out</th>
+                    <td>{formatThroughput(latestMetric?.netTx)}</td>
+                    <td>{stats.netTx.avg !== null ? formatThroughput(stats.netTx.avg) : '--'}</td>
+                    <td>{stats.netTx.peak !== null ? formatThroughput(stats.netTx.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Load 1m</th>
+                    <td>{formatLoad(latestMetric?.load1)}</td>
+                    <td>{stats.load1.avg !== null ? formatLoad(stats.load1.avg) : '--'}</td>
+                    <td>{stats.load1.peak !== null ? formatLoad(stats.load1.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Load 5m</th>
+                    <td>{formatLoad(latestMetric?.load5)}</td>
+                    <td>{stats.load5.avg !== null ? formatLoad(stats.load5.avg) : '--'}</td>
+                    <td>{stats.load5.peak !== null ? formatLoad(stats.load5.peak) : '--'}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Load 15m</th>
+                    <td>{formatLoad(latestMetric?.load15)}</td>
+                    <td>{stats.load15.avg !== null ? formatLoad(stats.load15.avg) : '--'}</td>
+                    <td>{stats.load15.peak !== null ? formatLoad(stats.load15.peak) : '--'}</td>
+                  </tr>
                 </tbody>
               </table>
+            </div>
+            <div className="insights-meta" role="list">
+              <div className="insights-meta__item" role="listitem">
+                <p className="insights-meta__label">CPU cores</p>
+                <p className="insights-meta__value">{formatCpuCores(latestMetric?.cpuCores)}</p>
+              </div>
+              <div className="insights-meta__item" role="listitem">
+                <p className="insights-meta__label">1m load per core</p>
+                <p className="insights-meta__value">{formatLoadPerCore(latestMetric?.load1, latestMetric?.cpuCores)}</p>
+              </div>
+              <div className="insights-meta__item" role="listitem">
+                <p className="insights-meta__label">5m load per core</p>
+                <p className="insights-meta__value">{formatLoadPerCore(latestMetric?.load5, latestMetric?.cpuCores)}</p>
+              </div>
             </div>
           </article>
         </section>

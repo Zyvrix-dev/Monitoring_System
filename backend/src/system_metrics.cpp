@@ -1,8 +1,18 @@
 #include "system_metrics.h"
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <tuple>
+#include <vector>
+#include <ctime>
+#include <sys/statvfs.h>
+#include <unistd.h>
 
 namespace
 {
@@ -10,10 +20,12 @@ constexpr const char *PROC_STAT_PATH = "/proc/stat";
 constexpr const char *PROC_MEMINFO_PATH = "/proc/meminfo";
 constexpr const char *PROC_TCP4_PATH = "/proc/net/tcp";
 constexpr const char *PROC_TCP6_PATH = "/proc/net/tcp6";
+constexpr const char *PROC_NET_DEV_PATH = "/proc/net/dev";
 }
 
 MetricsCollector::MetricsCollector()
-    : mutex_(), cpu_initialized_(false), previous_total_(0), previous_idle_(0)
+    : mutex_(), cpu_initialized_(false), previous_total_(0), previous_idle_(0), network_initialized_(false),
+      previous_rx_bytes_(0), previous_tx_bytes_(0), has_cached_sample_(false)
 {
 }
 
@@ -21,10 +33,34 @@ SystemMetrics MetricsCollector::collect()
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    const auto now = std::chrono::steady_clock::now();
+    if (has_cached_sample_)
+    {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_collection_time_);
+        if (elapsed.count() < 900)
+        {
+            return cached_metrics_;
+        }
+    }
+
     SystemMetrics metrics{};
+    metrics.timestamp = std::chrono::system_clock::now();
     metrics.cpuUsage = read_cpu_usage();
     metrics.memoryUsage = read_memory_usage();
     metrics.activeConnections = read_active_connections();
+    metrics.diskUsage = read_disk_usage();
+    auto [rx_rate, tx_rate] = read_network_throughput();
+    metrics.networkReceiveRate = rx_rate;
+    metrics.networkTransmitRate = tx_rate;
+    auto load_avgs = read_load_averages();
+    metrics.loadAverage1 = load_avgs[0];
+    metrics.loadAverage5 = load_avgs[1];
+    metrics.loadAverage15 = load_avgs[2];
+    metrics.cpuCount = detect_cpu_count();
+
+    cached_metrics_ = metrics;
+    last_collection_time_ = now;
+    has_cached_sample_ = true;
 
     return metrics;
 }
@@ -147,4 +183,134 @@ int MetricsCollector::count_connections_from_proc(const std::string &path)
     }
 
     return count;
+}
+
+double MetricsCollector::read_disk_usage()
+{
+    struct statvfs fs_stats
+    {
+    };
+    if (statvfs("/", &fs_stats) != 0)
+    {
+        return 0.0;
+    }
+
+    const double total = static_cast<double>(fs_stats.f_blocks) * static_cast<double>(fs_stats.f_frsize);
+    const double available = static_cast<double>(fs_stats.f_bavail) * static_cast<double>(fs_stats.f_frsize);
+    if (total <= 0.0)
+    {
+        return 0.0;
+    }
+
+    const double used = total - available;
+    const double usage = (used / total) * 100.0;
+    return std::clamp(usage, 0.0, 100.0);
+}
+
+std::tuple<double, double> MetricsCollector::read_network_throughput()
+{
+    std::ifstream net_file(PROC_NET_DEV_PATH);
+    if (!net_file.is_open())
+    {
+        return {0.0, 0.0};
+    }
+
+    std::string line;
+    // Skip the first two header lines
+    std::getline(net_file, line);
+    std::getline(net_file, line);
+
+    unsigned long long rx_total = 0;
+    unsigned long long tx_total = 0;
+
+    while (std::getline(net_file, line))
+    {
+        if (line.empty())
+        {
+            continue;
+        }
+
+        std::istringstream ss(line);
+        std::string interface_name;
+        std::getline(ss, interface_name, ':');
+        interface_name.erase(0, interface_name.find_first_not_of(" \t"));
+
+        if (interface_name == "lo")
+        {
+            continue; // Skip loopback interface
+        }
+
+        unsigned long long rx_bytes = 0;
+        unsigned long long tx_bytes = 0;
+        ss >> rx_bytes; // receive bytes
+
+        // Skip fields we do not need (7 fields after rx_bytes)
+        for (int i = 0; i < 7 && ss; ++i)
+        {
+            unsigned long long discard;
+            ss >> discard;
+        }
+
+        ss >> tx_bytes; // transmit bytes
+
+        rx_total += rx_bytes;
+        tx_total += tx_bytes;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    if (!network_initialized_)
+    {
+        network_initialized_ = true;
+        previous_rx_bytes_ = rx_total;
+        previous_tx_bytes_ = tx_total;
+        previous_network_sample_ = now;
+        return {0.0, 0.0};
+    }
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - previous_network_sample_);
+    previous_network_sample_ = now;
+
+    if (elapsed.count() <= 0.0)
+    {
+        return {0.0, 0.0};
+    }
+
+    const double rx_rate = static_cast<double>(rx_total - previous_rx_bytes_) / (1024.0 * elapsed.count());
+    const double tx_rate = static_cast<double>(tx_total - previous_tx_bytes_) / (1024.0 * elapsed.count());
+
+    previous_rx_bytes_ = rx_total;
+    previous_tx_bytes_ = tx_total;
+
+    return {std::max(0.0, rx_rate), std::max(0.0, tx_rate)};
+}
+
+std::array<double, 3> MetricsCollector::read_load_averages() const
+{
+    std::array<double, 3> loads{0.0, 0.0, 0.0};
+    if (getloadavg(loads.data(), static_cast<int>(loads.size())) != -1)
+    {
+        return loads;
+    }
+    return {0.0, 0.0, 0.0};
+}
+
+unsigned int MetricsCollector::detect_cpu_count() const
+{
+    const unsigned int count = std::thread::hardware_concurrency();
+    return count == 0 ? 1 : count;
+}
+
+std::string MetricsCollector::to_iso8601(const std::chrono::system_clock::time_point &timePoint)
+{
+    std::time_t time = std::chrono::system_clock::to_time_t(timePoint);
+    std::tm tm{};
+#ifdef _WIN32
+    gmtime_s(&tm, &time);
+#else
+    gmtime_r(&time, &tm);
+#endif
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
 }
