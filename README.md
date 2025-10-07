@@ -6,7 +6,9 @@ This repository contains a full-stack **Network Monitoring System** for capturin
 ---
 
 ## ⚙️ Features
-- 📡 Real-time network and system monitoring (CPU, memory, active connections)
+- 📡 Real-time network and system monitoring (CPU, memory, disk, load averages, active connections)
+- 📶 Live insight into network throughput with per-direction bandwidth tracking
+- 🔐 Optional API token enforcement for both REST and WebSocket endpoints plus server-side session limits
 - 🔌 WebSocket streaming from the C++ backend for low-latency updates
 - 🗄️ InfluxDB time-series database for historic metrics
 - 📊 Pre-built Grafana dashboards for operations visibility
@@ -58,6 +60,8 @@ Install the following tools depending on how you would like to run the system:
    - Frontend Dashboard → http://localhost:3000
    - Grafana UI → http://localhost:3001 (default login `admin` / `admin`)
 
+> 🔐 Set the environment variable `MONITORING_API_TOKEN` (and pass the same token to the frontend via `REACT_APP_API_TOKEN`) if you want to restrict access to the telemetry endpoints. When unset the services remain publicly readable for development convenience.
+
 > ℹ️  The first startup may take a few minutes while Docker pulls images and installs dependencies.
 
 ---
@@ -75,6 +79,8 @@ This spins up the databases while leaving the backend and frontend for manual ex
 ### 2. Run the C++ Backend Locally
 ```bash
 cd backend
+export MONITORING_API_TOKEN="your-secure-token"   # optional security hardening
+export MONITORING_WS_MAX_CLIENTS=32               # optional override
 cmake -S . -B build
 cmake --build build
 ./build/cpp_monitor
@@ -94,6 +100,7 @@ npm start
 By default the dashboard expects the backend at `ws://localhost:9002`. To point to a different environment create a `.env.local` file:
 ```bash
 REACT_APP_WS_URL=ws://your-backend-host:9002
+REACT_APP_API_TOKEN=your-secure-token
 ```
 Then restart the dev server so the new environment variable is applied.
 
@@ -133,6 +140,8 @@ Open Grafana at http://localhost:3001 (login: `admin` / `admin`) to explore and 
 
 ## 🧑‍💻 Development Notes
 - The C++ backend publishes metrics both via REST and WebSocket; the frontend only requires the WebSocket stream for real-time charts.
+- Metrics are cached for sub-second intervals to reduce kernel parsing overhead while still emitting second-level updates.
+- The monitoring agent now tracks CPU cores, load averages, disk usage and network throughput alongside CPU/memory/connection metrics.
 - Metrics are periodically written to InfluxDB for historic querying and dashboards.
 - Modify `frontend/src/App.js` or add new components under `frontend/src/components/` to extend the UI.
 - Update `backend/src/system_metrics.cpp` to change how metrics are collected from the host.

@@ -12,6 +12,7 @@
   --chart-blue: #2563eb;
   --chart-green: #16a34a;
   --chart-orange: #f97316;
+  --chart-purple: #8b5cf6;
   --chart-grid: rgba(148, 163, 184, 0.35);
   --accent-healthy: #22c55e;
   --accent-warning: #f59e0b;
@@ -474,6 +475,42 @@ a {
 
 .insights-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.insights {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.insights-meta {
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-top: 16px;
+}
+
+.insights-meta__item {
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.insights-meta__label {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.insights-meta__value {
+  margin: 6px 0 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .app-footer {
