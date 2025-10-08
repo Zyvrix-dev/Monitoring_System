@@ -3,6 +3,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -24,8 +25,16 @@ constexpr const char *PROC_NET_DEV_PATH = "/proc/net/dev";
 }
 
 MetricsCollector::MetricsCollector()
-    : mutex_(), cpu_initialized_(false), previous_total_(0), previous_idle_(0), network_initialized_(false),
-      previous_rx_bytes_(0), previous_tx_bytes_(0), has_cached_sample_(false)
+    : mutex_(),
+      cpu_initialized_(false),
+      previous_total_(0),
+      previous_idle_(0),
+      cpu_count_cached_(false),
+      cached_cpu_count_(1),
+      network_initialized_(false),
+      previous_rx_bytes_(0),
+      previous_tx_bytes_(0),
+      has_cached_sample_(false)
 {
 }
 
@@ -176,9 +185,48 @@ int MetricsCollector::count_connections_from_proc(const std::string &path)
 
     while (std::getline(tcp_file, line))
     {
-        if (!line.empty())
+        if (line.empty())
         {
+            continue;
+        }
+
+        std::istringstream ss(line);
+        std::string sl;
+        std::string local_address;
+        std::string rem_address;
+        std::string state_hex;
+
+        if (!(ss >> sl >> local_address >> rem_address >> state_hex))
+        {
+            continue;
+        }
+
+        int state = 0;
+        try
+        {
+            state = std::stoi(state_hex, nullptr, 16);
+        }
+        catch (const std::exception &)
+        {
+            continue;
+        }
+
+        switch (state)
+        {
+        case 0x01: // ESTABLISHED
+        case 0x02: // SYN_SENT
+        case 0x03: // SYN_RECV
+        case 0x04: // FIN_WAIT1
+        case 0x05: // FIN_WAIT2
+        case 0x06: // TIME_WAIT
+        case 0x08: // CLOSE_WAIT
+        case 0x09: // LAST_ACK
+        case 0x0B: // CLOSING
+        case 0x0C: // NEW_SYN_RECV
             ++count;
+            break;
+        default:
+            break;
         }
     }
 
@@ -294,10 +342,20 @@ std::array<double, 3> MetricsCollector::read_load_averages() const
     return {0.0, 0.0, 0.0};
 }
 
-unsigned int MetricsCollector::detect_cpu_count() const
+unsigned int MetricsCollector::detect_cpu_count()
+{
+    if (!cpu_count_cached_)
+    {
+        cached_cpu_count_ = query_cpu_count();
+        cpu_count_cached_ = true;
+    }
+    return cached_cpu_count_;
+}
+
+unsigned int MetricsCollector::query_cpu_count() const
 {
     const unsigned int count = std::thread::hardware_concurrency();
-    return count == 0 ? 1 : count;
+    return count == 0 ? 1U : count;
 }
 
 std::string MetricsCollector::to_iso8601(const std::chrono::system_clock::time_point &timePoint)

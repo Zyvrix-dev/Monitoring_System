@@ -1,26 +1,12 @@
 #include "rest_server.h"
+
+#include "token_utils.h"
+
 #include <cpprest/http_headers.h>
 #include <cpprest/json.h>
-#include <iostream>
+#include <exception>
 #include <functional>
-
-namespace
-{
-bool constant_time_equals(const std::string &lhs, const std::string &rhs)
-{
-    if (lhs.size() != rhs.size())
-    {
-        return false;
-    }
-
-    unsigned char result = 0;
-    for (std::size_t i = 0; i < lhs.size(); ++i)
-    {
-        result |= static_cast<unsigned char>(lhs[i] ^ rhs[i]);
-    }
-    return result == 0;
-}
-}
+#include <iostream>
 
 RestServer::RestServer(const std::string &url, std::string apiToken)
     : listener(utility::conversions::to_string_t(url)), collector(), api_token_(std::move(apiToken))
@@ -30,10 +16,18 @@ RestServer::RestServer(const std::string &url, std::string apiToken)
 
 void RestServer::start()
 {
-    listener.open()
-        .then([]
-              { std::cout << "REST endpoint listening for metrics" << std::endl; })
-        .wait();
+    try
+    {
+        listener.open()
+            .then([]
+                  { std::cout << "REST endpoint listening for metrics" << std::endl; })
+            .wait();
+    }
+    catch (const std::exception &ex)
+    {
+        std::cerr << "Failed to start REST listener: " << ex.what() << std::endl;
+        throw;
+    }
 }
 
 void RestServer::handle_get(web::http::http_request request)
@@ -93,5 +87,5 @@ bool RestServer::authorize(const web::http::http_request &request) const
     }
 
     const std::string token = headerValue.substr(sizeof(prefix) - 1);
-    return constant_time_equals(token, api_token_);
+    return security::tokens_equal(token, api_token_);
 }

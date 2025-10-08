@@ -38,12 +38,15 @@ private:
     double read_disk_usage();
     std::tuple<double, double> read_network_throughput();
     std::array<double, 3> read_load_averages() const;
-    unsigned int detect_cpu_count() const;
+    unsigned int detect_cpu_count();
+    unsigned int query_cpu_count() const;
 
     std::mutex mutex_;
     bool cpu_initialized_;
     unsigned long long previous_total_;
     unsigned long long previous_idle_;
+    bool cpu_count_cached_;
+    unsigned int cached_cpu_count_;
     bool network_initialized_;
     unsigned long long previous_rx_bytes_;
     unsigned long long previous_tx_bytes_;

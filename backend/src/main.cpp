@@ -1,40 +1,20 @@
 #include "rest_server.h"
+#include "server_config.h"
 #include "websocket_server.h"
-#include <thread>
+
 #include <iostream>
-#include <cstdlib>
-#include <string>
-#include <stdexcept>
+#include <thread>
 
 int main()
 {
-    const char *token_env = std::getenv("MONITORING_API_TOKEN");
-    std::string apiToken = token_env ? token_env : "";
+    const ServerConfig config = load_server_config();
 
-    std::size_t maxSessions = 32;
-    if (const char *max_sessions_env = std::getenv("MONITORING_WS_MAX_CLIENTS"))
-    {
-        try
-        {
-            unsigned long value = std::stoul(max_sessions_env);
-            if (value > 0)
-            {
-                maxSessions = value;
-            }
-        }
-        catch (const std::exception &)
-        {
-            std::cerr << "Invalid MONITORING_WS_MAX_CLIENTS value. Falling back to default." << std::endl;
-        }
-    }
+    RestServer restServer(config.metrics_endpoint, config.api_token);
+    std::thread rest_thread([&restServer]() { restServer.start(); });
+    rest_thread.detach();
 
-    RestServer restServer("http://0.0.0.0:8080/metrics", apiToken);
-    std::thread([&]
-                { restServer.start(); })
-        .detach();
-
-    WebSocketServer wsServer(9002, apiToken, maxSessions);
-    std::cout << "WebSocket server running on ws://localhost:9002" << std::endl;
+    WebSocketServer wsServer(config.websocket_port, config.api_token, config.max_sessions);
+    std::cout << "WebSocket server running on ws://0.0.0.0:" << config.websocket_port << std::endl;
     wsServer.run();
 
     return 0;
