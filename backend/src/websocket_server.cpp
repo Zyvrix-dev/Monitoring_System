@@ -144,14 +144,15 @@ void WebSocketServer::run() {
                         res.set(beast::http::field::server, BOOST_BEAST_VERSION_STRING " monitoring-service");
                     }));
 
-                    ws.accept();
+                    beast::http::request<beast::http::string_body> req;
+                    ws.accept(req);
 
-                    const auto params = parse_query_string(ws.request().target());
+                    const auto params = parse_query_string(req.target());
                     const auto it = params.find("token");
                     const std::string provided_token = it != params.end() ? it->second : std::string();
                     if (!is_token_valid(provided_token)) {
                         std::cerr << "Rejected WebSocket client due to invalid token" << std::endl;
-                        websocket::close_reason reason(websocket::close_code::policy_violation);
+                        websocket::close_reason reason(websocket::close_code::policy_error);
                         reason.reason = "Missing or invalid token";
                         ws.close(reason);
                         return;
