@@ -479,12 +479,6 @@ std::vector<ApplicationUsage> MetricsCollector::read_application_usage()
         return lhs.pid < rhs.pid;
     });
 
-    constexpr std::size_t maxApplications = 8;
-    if (result.size() > maxApplications)
-    {
-        result.resize(maxApplications);
-    }
-
     return result;
 }
 
@@ -587,12 +581,6 @@ std::vector<DomainUsage> MetricsCollector::build_domain_usage(const ConnectionSu
         }
         return lhs.domain < rhs.domain;
     });
-
-    constexpr std::size_t maxDomains = 10;
-    if (result.size() > maxDomains)
-    {
-        result.resize(maxDomains);
-    }
 
     return result;
 }

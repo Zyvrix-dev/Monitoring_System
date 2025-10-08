@@ -16,29 +16,31 @@ function DomainTrafficPanel({ domains, totalConnections, throughput }) {
         <div className="panel__helper" aria-live="polite">{summaryLabel}</div>
       </div>
       {hasData ? (
-        <table className="detail-table" aria-label="Network usage per domain">
-          <thead>
-            <tr>
-              <th scope="col">Remote domain</th>
-              <th scope="col">Connections</th>
-              <th scope="col">Inbound</th>
-              <th scope="col">Outbound</th>
-            </tr>
-          </thead>
-          <tbody>
-            {domains.map((domain) => (
-              <tr key={`${domain.domain}-${domain.connections}`}>
-                <th scope="row">
-                  <div className="entity-name">{domain.domain}</div>
-                  <div className="entity-meta">{formatConnections(domain.connections)} connections</div>
-                </th>
-                <td>{formatConnections(domain.connections)}</td>
-                <td>{formatThroughput(domain.receiveRate)}</td>
-                <td>{formatThroughput(domain.transmitRate)}</td>
+        <div className="panel__table-wrapper">
+          <table className="detail-table" aria-label="Network usage per domain">
+            <thead>
+              <tr>
+                <th scope="col">Remote domain</th>
+                <th scope="col">Connections</th>
+                <th scope="col">Inbound</th>
+                <th scope="col">Outbound</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {domains.map((domain) => (
+                <tr key={`${domain.domain}-${domain.connections}`}>
+                  <th scope="row">
+                    <div className="entity-name">{domain.domain}</div>
+                    <div className="entity-meta">{formatConnections(domain.connections)} connections</div>
+                  </th>
+                  <td>{formatConnections(domain.connections)}</td>
+                  <td>{formatThroughput(domain.receiveRate)}</td>
+                  <td>{formatThroughput(domain.transmitRate)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="panel__empty" role="status">
           <p>No network peers detected for the current sampling window.</p>

@@ -3,12 +3,14 @@ import React, { useMemo, useState } from 'react';
 import AppHeader from './components/AppHeader';
 import ApplicationUsagePanel from './components/ApplicationUsagePanel';
 import ConnectionsChart from './components/ConnectionsChart';
+import HistoryPanel from './components/HistoryPanel';
 import KpiGrid from './components/KpiGrid';
 import MetricChart from './components/MetricChart';
 import PerformanceSummary from './components/PerformanceSummary';
 import SettingsPanel from './components/SettingsPanel';
 import StatusTimeline from './components/StatusTimeline';
 import { useLiveMetrics } from './hooks/useLiveMetrics';
+import { useMetricsHistory } from './hooks/useMetricsHistory';
 import { useSettings } from './hooks/useSettings';
 import { buildStatistics } from './utils/statistics';
 import DomainTrafficPanel from './components/DomainTrafficPanel';
@@ -16,6 +18,7 @@ import DomainTrafficPanel from './components/DomainTrafficPanel';
 function App() {
   const { retentionSeconds, retentionDays, updateSetting } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const {
     metrics,
     latestMetric,
@@ -26,6 +29,18 @@ function App() {
   } = useLiveMetrics({ retentionSeconds });
 
   const stats = useMemo(() => buildStatistics(metrics), [metrics]);
+  const { snapshots, saveSnapshot, deleteSnapshot, clearSnapshots, exportSnapshot } = useMetricsHistory({
+    metrics,
+    latestMetric,
+    stats
+  });
+
+  const handleSaveSnapshot = () => {
+    const saved = saveSnapshot();
+    if (saved) {
+      setHistoryOpen(true);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -33,7 +48,11 @@ function App() {
         connectionState={connectionState}
         health={health}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenHistory={() => setHistoryOpen(true)}
+        onSaveSnapshot={handleSaveSnapshot}
         retentionDays={retentionDays}
+        canSaveSnapshot={metrics.length > 0}
+        historyCount={snapshots.length}
       />
 
       <main className="app-main">
@@ -100,6 +119,15 @@ function App() {
         onClose={() => setSettingsOpen(false)}
         retentionDays={retentionDays}
         onRetentionChange={(value) => updateSetting('retentionDays', value)}
+      />
+
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        snapshots={snapshots}
+        onDeleteSnapshot={deleteSnapshot}
+        onClearSnapshots={clearSnapshots}
+        onExportSnapshot={exportSnapshot}
       />
     </div>
   );
