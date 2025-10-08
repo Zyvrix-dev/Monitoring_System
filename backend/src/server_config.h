@@ -12,4 +12,3 @@ struct ServerConfig
 };
 
 ServerConfig load_server_config();
-

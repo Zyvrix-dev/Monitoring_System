@@ -1,30 +1,32 @@
-import React from 'react';
+import React from "react";
 
 const trendIcon = {
-  up: '▲',
-  down: '▼',
-  steady: '◆'
+  up: "▲",
+  down: "▼",
+  steady: "◆",
 };
 
 const trendLabel = {
-  up: 'Increasing',
-  down: 'Decreasing',
-  steady: 'Stable'
+  up: "Increasing",
+  down: "Decreasing",
+  steady: "Stable",
 };
 
 function MetricCard({ title, value, unit, helper, trend, status, onSelect }) {
   const hasUnit = unit && unit.trim().length > 0;
-  const visualStatus = status ? `metric-card--${status}` : 'metric-card--neutral';
-  const formattedValue = value === null || value === undefined ? '--' : value;
-  const showUnit = hasUnit && formattedValue !== '--';
-  const interactive = typeof onSelect === 'function';
+  const visualStatus = status
+    ? `metric-card--${status}`
+    : "metric-card--neutral";
+  const formattedValue = value === null || value === undefined ? "--" : value;
+  const showUnit = hasUnit && formattedValue !== "--";
+  const interactive = typeof onSelect === "function";
 
   const handleKeyDown = (event) => {
     if (!interactive) {
       return;
     }
 
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onSelect();
     }
@@ -32,10 +34,12 @@ function MetricCard({ title, value, unit, helper, trend, status, onSelect }) {
 
   return (
     <article
-      className={`metric-card ${visualStatus} ${interactive ? 'metric-card--interactive' : ''}`}
+      className={`metric-card ${visualStatus} ${
+        interactive ? "metric-card--interactive" : ""
+      }`}
       onClick={interactive ? onSelect : undefined}
       onKeyDown={handleKeyDown}
-      role={interactive ? 'button' : undefined}
+      role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
     >
       <header className="metric-card__header">
@@ -47,11 +51,13 @@ function MetricCard({ title, value, unit, helper, trend, status, onSelect }) {
       </div>
       {helper && <p className="metric-card__helper">{helper}</p>}
       {trend && (
-        <p className={`metric-card__trend metric-card__trend--${trend.direction}`}>
+        <p
+          className={`metric-card__trend metric-card__trend--${trend.direction}`}
+        >
           <span
             className="metric-card__trend-icon"
             role="img"
-            aria-label={trendLabel[trend.direction] || 'Trend'}
+            aria-label={trendLabel[trend.direction] || "Trend"}
           >
             {trendIcon[trend.direction] || trendIcon.steady}
           </span>

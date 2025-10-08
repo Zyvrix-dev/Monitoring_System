@@ -1,32 +1,32 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from "react";
 
-import { formatMegabytes, formatPercentLabel } from '../utils/formatters';
+import { formatMegabytes, formatPercentLabel } from "../utils/formatters";
 
 const ACTIVE_CPU_THRESHOLD = 1;
 
 const FILTERS = [
   {
-    id: 'all',
-    label: 'All processes',
-    predicate: () => true
+    id: "all",
+    label: "All processes",
+    predicate: () => true,
   },
   {
-    id: 'active',
-    label: 'Active',
-    predicate: (app) => app.cpu >= ACTIVE_CPU_THRESHOLD
+    id: "active",
+    label: "Active",
+    predicate: (app) => app.cpu >= ACTIVE_CPU_THRESHOLD,
   },
   {
-    id: 'background',
-    label: 'Background',
-    predicate: (app) => app.cpu < ACTIVE_CPU_THRESHOLD
-  }
+    id: "background",
+    label: "Background",
+    predicate: (app) => app.cpu < ACTIVE_CPU_THRESHOLD,
+  },
 ];
 
 const getFilterCount = (counts, filterId) => {
   switch (filterId) {
-    case 'active':
+    case "active":
       return counts.active;
-    case 'background':
+    case "background":
       return counts.background;
     default:
       return counts.all;
@@ -34,27 +34,28 @@ const getFilterCount = (counts, filterId) => {
 };
 
 const buildFilterMessage = (filterId) => {
-  if (filterId === 'active') {
-    return 'No active processes detected in the latest sample. Waiting for CPU activity spikes.';
+  if (filterId === "active") {
+    return "No active processes detected in the latest sample. Waiting for CPU activity spikes.";
   }
-  if (filterId === 'background') {
+  if (filterId === "background") {
     return `No background processes below ${ACTIVE_CPU_THRESHOLD}% CPU were observed this cycle.`;
   }
-  return 'No processes matched the current filter.';
+  return "No processes matched the current filter.";
 };
 
 function ApplicationUsagePanel({ applications }) {
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState("all");
 
   const { filteredApplications, counts, selectedFilter } = useMemo(() => {
     const fallbackFilter = FILTERS[0];
-    const filter = FILTERS.find((item) => item.id === activeFilter) || fallbackFilter;
+    const filter =
+      FILTERS.find((item) => item.id === activeFilter) || fallbackFilter;
 
     if (!Array.isArray(applications) || applications.length === 0) {
       return {
         filteredApplications: [],
         counts: { all: 0, active: 0, background: 0 },
-        selectedFilter: filter
+        selectedFilter: filter,
       };
     }
 
@@ -72,14 +73,15 @@ function ApplicationUsagePanel({ applications }) {
         ...app,
         cpu,
         memoryMb,
-        commandLine: typeof app?.commandLine === 'string' ? app.commandLine : ''
+        commandLine:
+          typeof app?.commandLine === "string" ? app.commandLine : "",
       };
     });
 
     return {
       filteredApplications: normalised.filter((app) => filter.predicate(app)),
       counts: totals,
-      selectedFilter: filter
+      selectedFilter: filter,
     };
   }, [applications, activeFilter]);
 
@@ -91,24 +93,34 @@ function ApplicationUsagePanel({ applications }) {
       <div className="panel__header">
         <div>
           <h2>Application utilisation</h2>
-          <p>Top processes ranked by CPU saturation with resident memory usage.</p>
+          <p>
+            Top processes ranked by CPU saturation with resident memory usage.
+          </p>
         </div>
       </div>
       <div className="application-usage__controls">
-        <div className="application-usage__filters" role="group" aria-label="Filter processes by activity">
+        <div
+          className="application-usage__filters"
+          role="group"
+          aria-label="Filter processes by activity"
+        >
           {FILTERS.map((filter) => {
             const isActive = filter.id === selectedFilter.id;
             return (
               <button
                 key={filter.id}
                 type="button"
-                className={`application-usage__filter${isActive ? ' application-usage__filter--active' : ''}`}
+                className={`application-usage__filter${
+                  isActive ? " application-usage__filter--active" : ""
+                }`}
                 onClick={() => setActiveFilter(filter.id)}
                 aria-pressed={isActive}
-                disabled={!hasData && filter.id !== 'all'}
+                disabled={!hasData && filter.id !== "all"}
               >
                 {filter.label}
-                <span className="application-usage__filter-count">{getFilterCount(counts, filter.id)}</span>
+                <span className="application-usage__filter-count">
+                  {getFilterCount(counts, filter.id)}
+                </span>
               </button>
             );
           })}
@@ -117,7 +129,7 @@ function ApplicationUsagePanel({ applications }) {
           <div className="application-usage__meta" role="status">
             <span>
               Showing {filteredApplications.length} of {counts.all} processes
-              {selectedFilter.id !== 'all' ? ` · ${selectedFilter.label}` : ''}
+              {selectedFilter.id !== "all" ? ` · ${selectedFilter.label}` : ""}
             </span>
             <span>
               Active: {counts.active} · Background: {counts.background}
@@ -128,7 +140,10 @@ function ApplicationUsagePanel({ applications }) {
       {hasData ? (
         hasFilteredRows ? (
           <div className="panel__table-wrapper">
-            <table className="detail-table" aria-label="Top application resource usage">
+            <table
+              className="detail-table"
+              aria-label="Top application resource usage"
+            >
               <thead>
                 <tr>
                   <th scope="col">Application</th>
@@ -140,7 +155,10 @@ function ApplicationUsagePanel({ applications }) {
               <tbody>
                 {filteredApplications.map((app) => {
                   const displayName = app.name || `Process ${app.pid}`;
-                  const commandLine = app.commandLine && app.commandLine !== displayName ? app.commandLine : '';
+                  const commandLine =
+                    app.commandLine && app.commandLine !== displayName
+                      ? app.commandLine
+                      : "";
                   return (
                     <tr key={`${app.pid}-${displayName}`}>
                       <th scope="row">
@@ -148,7 +166,10 @@ function ApplicationUsagePanel({ applications }) {
                         <div className="entity-meta">
                           PID {app.pid}
                           {commandLine ? (
-                            <span className="entity-meta__command" title={app.commandLine}>
+                            <span
+                              className="entity-meta__command"
+                              title={app.commandLine}
+                            >
                               {commandLine}
                             </span>
                           ) : null}
@@ -178,4 +199,3 @@ function ApplicationUsagePanel({ applications }) {
 }
 
 export default ApplicationUsagePanel;
-

@@ -26,63 +26,64 @@ using tcp = net::ip::tcp;
 
 namespace
 {
-std::unordered_map<std::string, std::string> parse_query_string(beast::string_view target)
-{
-    std::unordered_map<std::string, std::string> params;
-    const auto pos = target.find('?');
-    if (pos == beast::string_view::npos)
+    std::unordered_map<std::string, std::string> parse_query_string(beast::string_view target)
     {
+        std::unordered_map<std::string, std::string> params;
+        const auto pos = target.find('?');
+        if (pos == beast::string_view::npos)
+        {
+            return params;
+        }
+
+        const auto query = target.substr(pos + 1);
+        std::string query_str(query);
+        std::stringstream ss(query_str);
+        std::string pair;
+
+        auto url_decode = [](const std::string &value)
+        {
+            std::string result;
+            result.reserve(value.size());
+            for (std::size_t i = 0; i < value.size(); ++i)
+            {
+                if (value[i] == '%' && i + 2 < value.size())
+                {
+                    std::string hex = value.substr(i + 1, 2);
+                    char decoded = static_cast<char>(std::strtol(hex.c_str(), nullptr, 16));
+                    result.push_back(decoded);
+                    i += 2;
+                }
+                else if (value[i] == '+')
+                {
+                    result.push_back(' ');
+                }
+                else
+                {
+                    result.push_back(value[i]);
+                }
+            }
+            return result;
+        };
+
+        while (std::getline(ss, pair, '&'))
+        {
+            if (pair.empty())
+            {
+                continue;
+            }
+            const auto equal_pos = pair.find('=');
+            if (equal_pos == std::string::npos)
+            {
+                continue;
+            }
+
+            std::string key = pair.substr(0, equal_pos);
+            std::string value = pair.substr(equal_pos + 1);
+            params[url_decode(key)] = url_decode(value);
+        }
+
         return params;
     }
-
-    const auto query = target.substr(pos + 1);
-    std::string query_str(query);
-    std::stringstream ss(query_str);
-    std::string pair;
-
-    auto url_decode = [](const std::string &value) {
-        std::string result;
-        result.reserve(value.size());
-        for (std::size_t i = 0; i < value.size(); ++i)
-        {
-            if (value[i] == '%' && i + 2 < value.size())
-            {
-                std::string hex = value.substr(i + 1, 2);
-                char decoded = static_cast<char>(std::strtol(hex.c_str(), nullptr, 16));
-                result.push_back(decoded);
-                i += 2;
-            }
-            else if (value[i] == '+')
-            {
-                result.push_back(' ');
-            }
-            else
-            {
-                result.push_back(value[i]);
-            }
-        }
-        return result;
-    };
-
-    while (std::getline(ss, pair, '&'))
-    {
-        if (pair.empty())
-        {
-            continue;
-        }
-        const auto equal_pos = pair.find('=');
-        if (equal_pos == std::string::npos)
-        {
-            continue;
-        }
-
-        std::string key = pair.substr(0, equal_pos);
-        std::string value = pair.substr(equal_pos + 1);
-        params[url_decode(key)] = url_decode(value);
-    }
-
-    return params;
-}
 
 }
 
@@ -90,7 +91,8 @@ WebSocketServer::WebSocketServer(unsigned short port, std::string apiToken, std:
     : collector(), port_(port), api_token_(std::move(apiToken)),
       max_sessions_(maxSessions == 0 ? 1 : maxSessions), active_sessions_(0) {}
 
-SystemMetrics WebSocketServer::collect_once() {
+SystemMetrics WebSocketServer::collect_once()
+{
     return collector.collect();
 }
 
@@ -109,19 +111,23 @@ bool WebSocketServer::is_token_valid(const std::string &provided) const
     return security::tokens_equal(provided, api_token_);
 }
 
-void WebSocketServer::run() {
-    try {
+void WebSocketServer::run()
+{
+    try
+    {
         net::io_context ioc{1};
         tcp::acceptor acceptor{ioc, tcp::endpoint(tcp::v4(), port_)};
 
         std::cout << "WebSocket server listening on port: " << port_ << std::endl;
 
-        for (;;) {
+        for (;;)
+        {
             tcp::socket socket{ioc};
             acceptor.accept(socket);
 
             // Launch a detached thread to handle the session
-            std::thread([s = std::move(socket), this]() mutable {
+            std::thread([s = std::move(socket), this]() mutable
+                        {
                 try {
                     s.set_option(tcp::no_delay(true));
                     s.set_option(net::socket_base::keep_alive(true));
@@ -276,11 +282,12 @@ void WebSocketServer::run() {
                 } catch (const std::exception& e) {
                     // Session error — log and exit thread
                     std::cerr << "WebSocket session error: " << e.what() << std::endl;
-                }
-            }).detach();
+                } })
+                .detach();
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception &e)
+    {
         std::cerr << "WebSocket server fatal error: " << e.what() << std::endl;
     }
 }
-

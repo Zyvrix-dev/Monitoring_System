@@ -1,6 +1,10 @@
-import React from 'react';
+import React from "react";
 
-import { formatCount, formatConnections, formatThroughput } from '../utils/formatters';
+import {
+  formatCount,
+  formatConnections,
+  formatThroughput,
+} from "../utils/formatters";
 
 function SecurityOverview({ latestMetric }) {
   const tcpListeners = formatCount(latestMetric?.listeningTcp);
@@ -25,7 +29,9 @@ function SecurityOverview({ latestMetric }) {
           <tbody>
             <tr>
               <th scope="row">Listening sockets</th>
-              <td>{tcpListeners} TCP • {udpListeners} UDP</td>
+              <td>
+                {tcpListeners} TCP • {udpListeners} UDP
+              </td>
             </tr>
             <tr>
               <th scope="row">Active remote domains</th>
@@ -33,7 +39,9 @@ function SecurityOverview({ latestMetric }) {
             </tr>
             <tr>
               <th scope="row">Average network throughput (30s)</th>
-              <td>↓{avgInbound} • ↑{avgOutbound}</td>
+              <td>
+                ↓{avgInbound} • ↑{avgOutbound}
+              </td>
             </tr>
             <tr>
               <th scope="row">Open file descriptors</th>

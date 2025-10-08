@@ -1,16 +1,22 @@
-import React from 'react';
+import React from "react";
 
-import MetricCard from './MetricCard';
+import MetricCard from "./MetricCard";
 import {
   formatConnections,
   formatCount,
   formatPercent,
   formatThroughput,
-  formatThroughputPair
-} from '../utils/formatters';
-import { buildTrend } from '../utils/trends';
+  formatThroughputPair,
+} from "../utils/formatters";
+import { buildTrend } from "../utils/trends";
 
-function KpiGrid({ latestMetric, previousMetric, stats, health, onSelectMetric }) {
+function KpiGrid({
+  latestMetric,
+  previousMetric,
+  stats,
+  health,
+  onSelectMetric,
+}) {
   return (
     <section className="kpi-grid" aria-label="Key metrics">
       <MetricCard
@@ -18,54 +24,62 @@ function KpiGrid({ latestMetric, previousMetric, stats, health, onSelectMetric }
         value={formatPercent(latestMetric?.cpu)}
         unit="%"
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'cpu', '%')}
+        trend={buildTrend(latestMetric, previousMetric, "cpu", "%")}
         helper={
           stats.cpu?.avg !== null
-            ? `Avg ${formatPercent(stats.cpu.avg)}% • Peak ${formatPercent(stats.cpu.peak)}%`
-            : 'Waiting for samples'
+            ? `Avg ${formatPercent(stats.cpu.avg)}% • Peak ${formatPercent(
+                stats.cpu.peak
+              )}%`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('cpu')}
+        onSelect={() => onSelectMetric?.("cpu")}
       />
       <MetricCard
         title="Memory usage"
         value={formatPercent(latestMetric?.memory)}
         unit="%"
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'memory', '%')}
+        trend={buildTrend(latestMetric, previousMetric, "memory", "%")}
         helper={
           stats.memory?.avg !== null
-            ? `Avg ${formatPercent(stats.memory.avg)}% • Peak ${formatPercent(stats.memory.peak)}%`
-            : 'Waiting for samples'
+            ? `Avg ${formatPercent(stats.memory.avg)}% • Peak ${formatPercent(
+                stats.memory.peak
+              )}%`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('memory')}
+        onSelect={() => onSelectMetric?.("memory")}
       />
       <MetricCard
         title="Disk usage"
         value={formatPercent(latestMetric?.disk)}
         unit="%"
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'disk', '%')}
+        trend={buildTrend(latestMetric, previousMetric, "disk", "%")}
         helper={
           stats.disk?.avg !== null
-            ? `Avg ${formatPercent(stats.disk.avg)}% • Peak ${formatPercent(stats.disk.peak)}%`
-            : 'Waiting for samples'
+            ? `Avg ${formatPercent(stats.disk.avg)}% • Peak ${formatPercent(
+                stats.disk.peak
+              )}%`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('disk')}
+        onSelect={() => onSelectMetric?.("disk")}
       />
       <MetricCard
         title="Active connections"
         value={formatConnections(latestMetric?.connections)}
         status={health}
         unit=""
-        trend={buildTrend(latestMetric, previousMetric, 'connections', '')}
+        trend={buildTrend(latestMetric, previousMetric, "connections", "")}
         helper={
           stats.connections?.avg !== null
-            ? `Avg ${Math.round(stats.connections.avg).toLocaleString()} • Peak ${Math.round(
+            ? `Avg ${Math.round(
+                stats.connections.avg
+              ).toLocaleString()} • Peak ${Math.round(
                 stats.connections.peak
               ).toLocaleString()}`
-            : 'Waiting for samples'
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('connections')}
+        onSelect={() => onSelectMetric?.("connections")}
       />
       <MetricCard
         title="Network throughput"
@@ -75,105 +89,120 @@ function KpiGrid({ latestMetric, previousMetric, stats, health, onSelectMetric }
         trend={null}
         helper={
           stats.netRx?.avg !== null && stats.netTx?.avg !== null
-            ? `Avg ↓${formatThroughput(stats.netRx.avg)} • ↑${formatThroughput(stats.netTx.avg)}`
-            : 'Waiting for samples'
+            ? `Avg ↓${formatThroughput(stats.netRx.avg)} • ↑${formatThroughput(
+                stats.netTx.avg
+              )}`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('throughput')}
+        onSelect={() => onSelectMetric?.("throughput")}
       />
       <MetricCard
         title="CPU avg (60s)"
         value={formatPercent(latestMetric?.cpuAvg)}
         unit="%"
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'cpuAvg', '%')}
+        trend={buildTrend(latestMetric, previousMetric, "cpuAvg", "%")}
         helper={
           stats.cpuAvg?.avg !== null
             ? `Session avg ${formatPercent(stats.cpuAvg.avg)}%`
-            : 'Waiting for samples'
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('cpuAvg')}
+        onSelect={() => onSelectMetric?.("cpuAvg")}
       />
       <MetricCard
         title="Swap usage"
         value={formatPercent(latestMetric?.swap)}
         unit="%"
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'swap', '%')}
+        trend={buildTrend(latestMetric, previousMetric, "swap", "%")}
         helper={
           stats.swap?.avg !== null
-            ? `Avg ${formatPercent(stats.swap.avg)}% • Peak ${formatPercent(stats.swap.peak)}%`
-            : 'Waiting for samples'
+            ? `Avg ${formatPercent(stats.swap.avg)}% • Peak ${formatPercent(
+                stats.swap.peak
+              )}%`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('swap')}
+        onSelect={() => onSelectMetric?.("swap")}
       />
       <MetricCard
         title="Processes"
         value={formatCount(latestMetric?.processes)}
         unit=""
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'processes', '')}
+        trend={buildTrend(latestMetric, previousMetric, "processes", "")}
         helper={
           stats.processes?.avg !== null
-            ? `Avg ${formatCount(Math.round(stats.processes.avg))} • Peak ${formatCount(Math.round(stats.processes.peak))}`
-            : 'Waiting for samples'
+            ? `Avg ${formatCount(
+                Math.round(stats.processes.avg)
+              )} • Peak ${formatCount(Math.round(stats.processes.peak))}`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('processes')}
+        onSelect={() => onSelectMetric?.("processes")}
       />
       <MetricCard
         title="Threads"
         value={formatCount(latestMetric?.threads)}
         unit=""
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'threads', '')}
+        trend={buildTrend(latestMetric, previousMetric, "threads", "")}
         helper={
           stats.threads?.avg !== null
-            ? `Avg ${formatCount(Math.round(stats.threads.avg))} • Peak ${formatCount(Math.round(stats.threads.peak))}`
-            : 'Waiting for samples'
+            ? `Avg ${formatCount(
+                Math.round(stats.threads.avg)
+              )} • Peak ${formatCount(Math.round(stats.threads.peak))}`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('threads')}
+        onSelect={() => onSelectMetric?.("threads")}
       />
       <MetricCard
         title="Listening sockets"
-        value={`${formatCount(latestMetric?.listeningTcp)} / ${formatCount(latestMetric?.listeningUdp)}`}
+        value={`${formatCount(latestMetric?.listeningTcp)} / ${formatCount(
+          latestMetric?.listeningUdp
+        )}`}
         unit="TCP / UDP"
         status={health}
         trend={null}
         helper={
           stats.listeningTcp?.avg !== null && stats.listeningUdp?.avg !== null
-            ? `Avg TCP ${formatCount(Math.round(stats.listeningTcp.avg))} • UDP ${formatCount(Math.round(stats.listeningUdp.avg))}`
-            : 'Waiting for samples'
+            ? `Avg TCP ${formatCount(
+                Math.round(stats.listeningTcp.avg)
+              )} • UDP ${formatCount(Math.round(stats.listeningUdp.avg))}`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('listeningSockets')}
+        onSelect={() => onSelectMetric?.("listeningSockets")}
       />
       <MetricCard
         title="Unique domains"
         value={formatCount(latestMetric?.uniqueDomains)}
         unit=""
         status={health}
-        trend={buildTrend(latestMetric, previousMetric, 'uniqueDomains', '')}
+        trend={buildTrend(latestMetric, previousMetric, "uniqueDomains", "")}
         helper={
           stats.uniqueDomains?.avg !== null
-            ? `Avg ${formatCount(Math.round(stats.uniqueDomains.avg))} • Peak ${formatCount(Math.round(stats.uniqueDomains.peak))}`
-            : 'Waiting for samples'
+            ? `Avg ${formatCount(
+                Math.round(stats.uniqueDomains.avg)
+              )} • Peak ${formatCount(Math.round(stats.uniqueDomains.peak))}`
+            : "Waiting for samples"
         }
-        onSelect={() => onSelectMetric?.('uniqueDomains')}
+        onSelect={() => onSelectMetric?.("uniqueDomains")}
       />
       <MetricCard
         title="Docker containers"
         value={formatCount(latestMetric?.dockerContainers?.length ?? 0)}
         unit=""
-        status={latestMetric?.dockerAvailable ? 'healthy' : 'warning'}
+        status={latestMetric?.dockerAvailable ? "healthy" : "warning"}
         trend={null}
         helper={
           latestMetric?.dockerAvailable
-            ? `${formatCount(latestMetric?.dockerImages?.length ?? 0)} images discovered`
-            : 'Docker CLI unavailable'
+            ? `${formatCount(
+                latestMetric?.dockerImages?.length ?? 0
+              )} images discovered`
+            : "Docker CLI unavailable"
         }
-        onSelect={() => onSelectMetric?.('docker')}
+        onSelect={() => onSelectMetric?.("docker")}
       />
     </section>
   );
 }
 
 export default KpiGrid;
-

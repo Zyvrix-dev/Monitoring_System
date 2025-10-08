@@ -1,6 +1,6 @@
-import React from 'react';
+import React from "react";
 
-import { connectionLabel, healthLabel } from '../constants/status';
+import { connectionLabel, healthLabel } from "../constants/status";
 
 function AppHeader({
   connectionState,
@@ -10,32 +10,34 @@ function AppHeader({
   onSaveSnapshot,
   retentionDays,
   canSaveSnapshot,
-  historyCount
+  historyCount,
 }) {
   const handleOpenSettings = () => {
-    if (typeof onOpenSettings === 'function') {
+    if (typeof onOpenSettings === "function") {
       onOpenSettings();
     }
   };
 
   const handleOpenHistory = () => {
-    if (typeof onOpenHistory === 'function') {
+    if (typeof onOpenHistory === "function") {
       onOpenHistory();
     }
   };
 
   const handleSaveSnapshot = () => {
-    if (typeof onSaveSnapshot === 'function') {
+    if (typeof onSaveSnapshot === "function") {
       onSaveSnapshot();
     }
   };
 
   const retentionNumeric = Number(retentionDays);
-  const retentionLabel = Number.isFinite(retentionNumeric) && retentionNumeric > 0
-    ? `${retentionNumeric} day${retentionNumeric === 1 ? '' : 's'}`
-    : 'configurable retention';
+  const retentionLabel =
+    Number.isFinite(retentionNumeric) && retentionNumeric > 0
+      ? `${retentionNumeric} day${retentionNumeric === 1 ? "" : "s"}`
+      : "configurable retention";
 
-  const historyLabel = historyCount > 0 ? `History (${historyCount})` : 'History';
+  const historyLabel =
+    historyCount > 0 ? `History (${historyCount})` : "History";
 
   return (
     <header className="app-header">
@@ -43,9 +45,11 @@ function AppHeader({
         <p className="app-eyebrow">Observability Control Centre</p>
         <h1>Realtime Infrastructure Overview</h1>
         <p className="app-subtitle">
-          Unified insights for system health, utilisation and client connectivity.
-          {' '}
-          <span className="app-subtitle__meta">Currently retaining {retentionLabel} of streaming telemetry.</span>
+          Unified insights for system health, utilisation and client
+          connectivity.{" "}
+          <span className="app-subtitle__meta">
+            Currently retaining {retentionLabel} of streaming telemetry.
+          </span>
         </p>
       </div>
       <div className="app-header__status">
@@ -66,7 +70,11 @@ function AppHeader({
           >
             {historyLabel}
           </button>
-          <button type="button" className="header-button" onClick={handleOpenSettings}>
+          <button
+            type="button"
+            className="header-button"
+            onClick={handleOpenSettings}
+          >
             Dashboard settings
           </button>
         </div>
@@ -84,4 +92,3 @@ function AppHeader({
 }
 
 export default AppHeader;
-

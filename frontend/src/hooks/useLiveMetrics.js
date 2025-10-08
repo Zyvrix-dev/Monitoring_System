@@ -1,28 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { appConfig, buildWebSocketUrl } from '../config';
-import { connectionLabel } from '../constants/status';
-import { createStatusEvent, determineHealth } from '../utils/health';
-import { normaliseMetricPayload } from '../utils/payload';
+import { appConfig, buildWebSocketUrl } from "../config";
+import { connectionLabel } from "../constants/status";
+import { createStatusEvent, determineHealth } from "../utils/health";
+import { normaliseMetricPayload } from "../utils/payload";
 
 const CONNECTION_STATES = Object.keys(connectionLabel);
 
 const sanitiseConnectionState = (state) =>
-  CONNECTION_STATES.includes(state) ? state : 'connecting';
+  CONNECTION_STATES.includes(state) ? state : "connecting";
 
 const computeMaxPoints = (seconds) => {
   const interval = Math.max(appConfig.sampleIntervalSeconds || 1, 0.001);
-  const fallback = Math.max(1, Math.floor(appConfig.defaultRetentionSeconds / interval));
-  const desired = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds / interval) : fallback;
+  const fallback = Math.max(
+    1,
+    Math.floor(appConfig.defaultRetentionSeconds / interval)
+  );
+  const desired =
+    Number.isFinite(seconds) && seconds > 0
+      ? Math.floor(seconds / interval)
+      : fallback;
   const baseline = Math.max(1, appConfig.maxDataPoints || fallback);
   return Math.max(desired, fallback, baseline);
 };
 
 export const useLiveMetrics = ({ retentionSeconds } = {}) => {
   const [metrics, setMetrics] = useState([]);
-  const [connectionState, setConnectionState] = useState('connecting');
+  const [connectionState, setConnectionState] = useState("connecting");
   const [statusEvents, setStatusEvents] = useState([]);
-  const previousHealth = useRef('unknown');
+  const previousHealth = useRef("unknown");
   const retentionRef = useRef(
     Number.isFinite(retentionSeconds) && retentionSeconds > 0
       ? retentionSeconds
@@ -30,9 +36,10 @@ export const useLiveMetrics = ({ retentionSeconds } = {}) => {
   );
 
   useEffect(() => {
-    const seconds = Number.isFinite(retentionSeconds) && retentionSeconds > 0
-      ? retentionSeconds
-      : appConfig.defaultRetentionSeconds;
+    const seconds =
+      Number.isFinite(retentionSeconds) && retentionSeconds > 0
+        ? retentionSeconds
+        : appConfig.defaultRetentionSeconds;
     retentionRef.current = seconds;
     setMetrics((previous) => {
       const maxPoints = computeMaxPoints(seconds);
@@ -64,13 +71,13 @@ export const useLiveMetrics = ({ retentionSeconds } = {}) => {
         return;
       }
 
-      setConnectionState('connecting');
+      setConnectionState("connecting");
 
       ws = new WebSocket(buildWebSocketUrl());
 
       ws.onopen = () => {
         if (!cancelled) {
-          setConnectionState('connected');
+          setConnectionState("connected");
         }
       };
 
@@ -82,7 +89,7 @@ export const useLiveMetrics = ({ retentionSeconds } = {}) => {
           appendMetric(metric);
         } catch (error) {
           // eslint-disable-next-line no-console
-          console.error('Failed to parse metric payload', error);
+          console.error("Failed to parse metric payload", error);
         }
       };
 
@@ -90,7 +97,7 @@ export const useLiveMetrics = ({ retentionSeconds } = {}) => {
         if (cancelled) {
           return;
         }
-        setConnectionState('disconnected');
+        setConnectionState("disconnected");
         reconnectTimer = setTimeout(connect, 4000);
       };
 
@@ -108,14 +115,19 @@ export const useLiveMetrics = ({ retentionSeconds } = {}) => {
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      if (
+        ws &&
+        (ws.readyState === WebSocket.OPEN ||
+          ws.readyState === WebSocket.CONNECTING)
+      ) {
         ws.close();
       }
     };
   }, [appendMetric]);
 
   const latestMetric = metrics.length ? metrics[metrics.length - 1] : undefined;
-  const previousMetric = metrics.length > 1 ? metrics[metrics.length - 2] : undefined;
+  const previousMetric =
+    metrics.length > 1 ? metrics[metrics.length - 2] : undefined;
 
   useEffect(() => {
     if (!latestMetric) {
@@ -138,7 +150,6 @@ export const useLiveMetrics = ({ retentionSeconds } = {}) => {
     previousMetric,
     connectionState: sanitiseConnectionState(connectionState),
     health,
-    statusEvents
+    statusEvents,
   };
 };
-

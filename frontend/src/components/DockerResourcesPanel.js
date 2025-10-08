@@ -1,6 +1,6 @@
-import React from 'react';
+import React from "react";
 
-import { formatBoolean, formatCount } from '../utils/formatters';
+import { formatBoolean, formatCount } from "../utils/formatters";
 
 function DockerResourcesPanel({ dockerAvailable, containers, images }) {
   const hasContainers = Array.isArray(containers) && containers.length > 0;
@@ -35,11 +35,15 @@ function DockerResourcesPanel({ dockerAvailable, containers, images }) {
                     {containers.map((container) => (
                       <tr key={container.id || container.name}>
                         <th scope="row">
-                          <div className="entity-name">{container.name || container.id || 'Unnamed container'}</div>
+                          <div className="entity-name">
+                            {container.name ||
+                              container.id ||
+                              "Unnamed container"}
+                          </div>
                           <div className="entity-meta">{container.id}</div>
                         </th>
-                        <td>{container.image || 'Unknown image'}</td>
-                        <td>{container.status || 'Unknown'}</td>
+                        <td>{container.image || "Unknown image"}</td>
+                        <td>{container.status || "Unknown"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -67,11 +71,13 @@ function DockerResourcesPanel({ dockerAvailable, containers, images }) {
                     {images.map((image) => (
                       <tr key={`${image.repository}-${image.id}`}>
                         <th scope="row">
-                          <div className="entity-name">{image.repository || 'Unnamed repo'}</div>
+                          <div className="entity-name">
+                            {image.repository || "Unnamed repo"}
+                          </div>
                           <div className="entity-meta">{image.id}</div>
                         </th>
-                        <td>{image.tag || 'latest'}</td>
-                        <td>{image.size || 'Unknown'}</td>
+                        <td>{image.tag || "latest"}</td>
+                        <td>{image.size || "Unknown"}</td>
                       </tr>
                     ))}
                   </tbody>

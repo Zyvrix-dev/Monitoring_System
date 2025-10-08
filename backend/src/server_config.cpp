@@ -8,57 +8,57 @@
 namespace
 {
 
-unsigned short parse_port(const char *raw, unsigned short fallback)
-{
-    if (raw == nullptr || *raw == '\0')
+    unsigned short parse_port(const char *raw, unsigned short fallback)
     {
-        return fallback;
+        if (raw == nullptr || *raw == '\0')
+        {
+            return fallback;
+        }
+
+        try
+        {
+            const long value = std::stol(raw);
+            if (value <= 0 || value > std::numeric_limits<unsigned short>::max())
+            {
+                throw std::out_of_range("port out of range");
+            }
+            return static_cast<unsigned short>(value);
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Invalid MONITORING_WS_PORT value ('" << raw << "'): " << ex.what()
+                      << ". Falling back to " << fallback << std::endl;
+            return fallback;
+        }
     }
 
-    try
+    std::size_t parse_limit(const char *raw, std::size_t fallback, std::size_t min_value, std::size_t max_value)
     {
-        const long value = std::stol(raw);
-        if (value <= 0 || value > std::numeric_limits<unsigned short>::max())
+        if (raw == nullptr || *raw == '\0')
         {
-            throw std::out_of_range("port out of range");
+            return fallback;
         }
-        return static_cast<unsigned short>(value);
-    }
-    catch (const std::exception &ex)
-    {
-        std::cerr << "Invalid MONITORING_WS_PORT value ('" << raw << "'): " << ex.what()
-                  << ". Falling back to " << fallback << std::endl;
-        return fallback;
-    }
-}
 
-std::size_t parse_limit(const char *raw, std::size_t fallback, std::size_t min_value, std::size_t max_value)
-{
-    if (raw == nullptr || *raw == '\0')
-    {
-        return fallback;
-    }
-
-    try
-    {
-        const unsigned long long value = std::stoull(raw);
-        if (value < min_value)
+        try
         {
-            return min_value;
+            const unsigned long long value = std::stoull(raw);
+            if (value < min_value)
+            {
+                return min_value;
+            }
+            if (value > max_value)
+            {
+                return max_value;
+            }
+            return static_cast<std::size_t>(value);
         }
-        if (value > max_value)
+        catch (const std::exception &ex)
         {
-            return max_value;
+            std::cerr << "Invalid MONITORING_WS_MAX_CLIENTS value ('" << raw << "'): " << ex.what()
+                      << ". Falling back to " << fallback << std::endl;
+            return fallback;
         }
-        return static_cast<std::size_t>(value);
     }
-    catch (const std::exception &ex)
-    {
-        std::cerr << "Invalid MONITORING_WS_MAX_CLIENTS value ('" << raw << "'): " << ex.what()
-                  << ". Falling back to " << fallback << std::endl;
-        return fallback;
-    }
-}
 
 } // namespace
 
@@ -89,4 +89,3 @@ ServerConfig load_server_config()
 
     return config;
 }
-

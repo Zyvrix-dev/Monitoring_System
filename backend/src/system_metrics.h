@@ -53,30 +53,30 @@ struct DockerImageSummary
 
 struct SystemMetrics
 {
-    double cpuUsage;       // CPU usage in %
-    double memoryUsage;    // Memory usage in %
-    int activeConnections; // Active TCP connections
-    double diskUsage;      // Root filesystem usage in %
-    double loadAverage1;   // Load average for the last minute
-    double loadAverage5;   // Load average for the last 5 minutes
-    double loadAverage15;  // Load average for the last 15 minutes
-    double networkReceiveRate; // Inbound network throughput in KB/s
-    double networkTransmitRate; // Outbound network throughput in KB/s
-    double networkReceiveRateAverage; // Rolling average inbound throughput in KB/s
-    double networkTransmitRateAverage; // Rolling average outbound throughput in KB/s
-    double cpuUsageAverage; // Rolling average CPU usage in %
-    double swapUsage;      // Swap usage in %
-    unsigned int cpuCount;     // Number of logical CPU cores
-    unsigned int processCount; // Total number of running processes
-    unsigned int threadCount;  // Total number of threads across processes
-    unsigned int listeningTcp; // TCP listening sockets
-    unsigned int listeningUdp; // UDP listening sockets
-    unsigned long openFileDescriptors; // Open file descriptors reported by kernel
-    std::size_t uniqueDomains;         // Unique remote domains observed
-    std::chrono::system_clock::time_point timestamp; // Collection time
-    std::vector<ApplicationUsage> topApplications;    // Top processes by utilisation
-    std::vector<DomainUsage> domainUsage;             // Aggregated network usage per domain
-    bool dockerAvailable;                              // Whether Docker CLI is accessible
+    double cpuUsage;                                      // CPU usage in %
+    double memoryUsage;                                   // Memory usage in %
+    int activeConnections;                                // Active TCP connections
+    double diskUsage;                                     // Root filesystem usage in %
+    double loadAverage1;                                  // Load average for the last minute
+    double loadAverage5;                                  // Load average for the last 5 minutes
+    double loadAverage15;                                 // Load average for the last 15 minutes
+    double networkReceiveRate;                            // Inbound network throughput in KB/s
+    double networkTransmitRate;                           // Outbound network throughput in KB/s
+    double networkReceiveRateAverage;                     // Rolling average inbound throughput in KB/s
+    double networkTransmitRateAverage;                    // Rolling average outbound throughput in KB/s
+    double cpuUsageAverage;                               // Rolling average CPU usage in %
+    double swapUsage;                                     // Swap usage in %
+    unsigned int cpuCount;                                // Number of logical CPU cores
+    unsigned int processCount;                            // Total number of running processes
+    unsigned int threadCount;                             // Total number of threads across processes
+    unsigned int listeningTcp;                            // TCP listening sockets
+    unsigned int listeningUdp;                            // UDP listening sockets
+    unsigned long openFileDescriptors;                    // Open file descriptors reported by kernel
+    std::size_t uniqueDomains;                            // Unique remote domains observed
+    std::chrono::system_clock::time_point timestamp;      // Collection time
+    std::vector<ApplicationUsage> topApplications;        // Top processes by utilisation
+    std::vector<DomainUsage> domainUsage;                 // Aggregated network usage per domain
+    bool dockerAvailable;                                 // Whether Docker CLI is accessible
     std::vector<DockerContainerSummary> dockerContainers; // Running Docker containers
     std::vector<DockerImageSummary> dockerImages;         // Available Docker images
 };

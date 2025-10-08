@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from "react";
 
 function SettingsPanel({ open, onClose, retentionDays, onRetentionChange }) {
   const safeRetention = useMemo(() => {
@@ -26,30 +26,47 @@ function SettingsPanel({ open, onClose, retentionDays, onRetentionChange }) {
     }
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, onClose]);
 
   return (
-    <div className={`settings-panel ${open ? 'settings-panel--open' : ''}`} aria-hidden={!open}>
-      <div className="settings-panel__backdrop" role="presentation" onClick={onClose} />
-      <aside className="settings-panel__surface" role="dialog" aria-modal="true" aria-labelledby="settings-panel-title">
+    <div
+      className={`settings-panel ${open ? "settings-panel--open" : ""}`}
+      aria-hidden={!open}
+    >
+      <div
+        className="settings-panel__backdrop"
+        role="presentation"
+        onClick={onClose}
+      />
+      <aside
+        className="settings-panel__surface"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-panel-title"
+      >
         <header className="settings-panel__header">
           <div>
             <p className="settings-panel__eyebrow">Configuration</p>
             <h2 id="settings-panel-title">Dashboard settings</h2>
             <p className="settings-panel__summary">
-              Control retention of historical samples for time series visualisations.
+              Control retention of historical samples for time series
+              visualisations.
             </p>
           </div>
-          <button type="button" className="settings-panel__close" onClick={onClose}>
+          <button
+            type="button"
+            className="settings-panel__close"
+            onClick={onClose}
+          >
             Close
           </button>
         </header>
@@ -58,8 +75,9 @@ function SettingsPanel({ open, onClose, retentionDays, onRetentionChange }) {
             Data retention window
           </label>
           <p className="settings-panel__description">
-            Choose how many days of metrics to retain in the live session. Increasing this enables long-term trend
-            analysis at the cost of higher memory usage in the browser.
+            Choose how many days of metrics to retain in the live session.
+            Increasing this enables long-term trend analysis at the cost of
+            higher memory usage in the browser.
           </p>
           <div className="settings-panel__field">
             <input
@@ -92,4 +110,3 @@ function SettingsPanel({ open, onClose, retentionDays, onRetentionChange }) {
 }
 
 export default SettingsPanel;
-

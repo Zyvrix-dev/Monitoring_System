@@ -6,10 +6,12 @@
 
 #include "system_metrics.h"
 
-class WebSocketServer {
+class WebSocketServer
+{
 public:
     explicit WebSocketServer(unsigned short port, std::string apiToken = {}, std::size_t maxSessions = 32);
     void run();
+
 private:
     SystemMetrics collect_once();
     MetricsCollector collector;

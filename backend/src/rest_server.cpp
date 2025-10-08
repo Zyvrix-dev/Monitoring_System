@@ -17,24 +17,25 @@
 
 namespace
 {
-std::string to_lower_copy(const std::string &value)
-{
-    std::string result(value.size(), '\0');
-    std::transform(value.begin(), value.end(), result.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-    return result;
-}
-
-bool icontains(const std::string &haystack, const std::string &needle)
-{
-    if (needle.empty())
+    std::string to_lower_copy(const std::string &value)
     {
-        return false;
+        std::string result(value.size(), '\0');
+        std::transform(value.begin(), value.end(), result.begin(), [](unsigned char ch)
+                       { return static_cast<char>(std::tolower(ch)); });
+        return result;
     }
 
-    std::string hay = to_lower_copy(haystack);
-    std::string need = to_lower_copy(needle);
-    return hay.find(need) != std::string::npos;
-}
+    bool icontains(const std::string &haystack, const std::string &needle)
+    {
+        if (needle.empty())
+        {
+            return false;
+        }
+
+        std::string hay = to_lower_copy(haystack);
+        std::string need = to_lower_copy(needle);
+        return hay.find(need) != std::string::npos;
+    }
 } // namespace
 
 RestServer::RestServer(const std::string &url, std::string apiToken)

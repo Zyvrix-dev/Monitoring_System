@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 function StatusTimeline({ events }) {
   if (!events.length) {
@@ -8,7 +8,10 @@ function StatusTimeline({ events }) {
   return (
     <ul className="timeline" aria-live="polite">
       {events.map((event) => (
-        <li key={event.id} className={`timeline__item timeline__item--${event.status}`}>
+        <li
+          key={event.id}
+          className={`timeline__item timeline__item--${event.status}`}
+        >
           <div className="timeline__marker" aria-hidden="true" />
           <div className="timeline__content">
             <div className="timeline__meta">
