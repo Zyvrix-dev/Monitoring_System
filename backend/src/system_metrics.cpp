@@ -880,7 +880,7 @@ MetricsCollector::ConnectionSummary MetricsCollector::read_connection_summary()
     ConnectionSummary summary{};
     summary.totalConnections = 0;
 
-    auto parse_tcp_file = [&summary](const std::string &path, bool ipv6) {
+    auto parse_tcp_file = [this, &summary](const std::string &path, bool ipv6) {
         std::ifstream tcp_file(path);
         if (!tcp_file.is_open())
         {
