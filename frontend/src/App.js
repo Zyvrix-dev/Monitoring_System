@@ -1,15 +1,21 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import AppHeader from './components/AppHeader';
+import ApplicationUsagePanel from './components/ApplicationUsagePanel';
 import ConnectionsChart from './components/ConnectionsChart';
 import KpiGrid from './components/KpiGrid';
 import MetricChart from './components/MetricChart';
 import PerformanceSummary from './components/PerformanceSummary';
+import SettingsPanel from './components/SettingsPanel';
 import StatusTimeline from './components/StatusTimeline';
 import { useLiveMetrics } from './hooks/useLiveMetrics';
+import { useSettings } from './hooks/useSettings';
 import { buildStatistics } from './utils/statistics';
+import DomainTrafficPanel from './components/DomainTrafficPanel';
 
 function App() {
+  const { retentionSeconds, retentionDays, updateSetting } = useSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const {
     metrics,
     latestMetric,
@@ -17,13 +23,18 @@ function App() {
     connectionState,
     health,
     statusEvents
-  } = useLiveMetrics();
+  } = useLiveMetrics({ retentionSeconds });
 
   const stats = useMemo(() => buildStatistics(metrics), [metrics]);
 
   return (
     <div className="app-shell">
-      <AppHeader connectionState={connectionState} health={health} />
+      <AppHeader
+        connectionState={connectionState}
+        health={health}
+        onOpenSettings={() => setSettingsOpen(true)}
+        retentionDays={retentionDays}
+      />
 
       <main className="app-main">
         <KpiGrid
@@ -69,11 +80,27 @@ function App() {
 
           <PerformanceSummary latestMetric={latestMetric} stats={stats} />
         </section>
+
+        <section className="panel-grid panel-grid--balanced" aria-label="Process and network analytics">
+          <ApplicationUsagePanel applications={latestMetric?.applications ?? []} />
+          <DomainTrafficPanel
+            domains={latestMetric?.domains ?? []}
+            totalConnections={latestMetric?.connections}
+            throughput={{ inbound: latestMetric?.netRx, outbound: latestMetric?.netTx }}
+          />
+        </section>
       </main>
 
       <footer className="app-footer">
         <p>Monitoring System · Ready for launch</p>
       </footer>
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        retentionDays={retentionDays}
+        onRetentionChange={(value) => updateSetting('retentionDays', value)}
+      />
     </div>
   );
 }

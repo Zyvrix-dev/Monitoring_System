@@ -70,3 +70,14 @@ export const formatCpuCores = (value) => {
   return numeric.toLocaleString();
 };
 
+export const formatMegabytes = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '--';
+  }
+  if (numeric >= 1024) {
+    return `${(numeric / 1024).toFixed(2)} GB`;
+  }
+  return `${numeric.toFixed(1)} MB`;
+};
+
