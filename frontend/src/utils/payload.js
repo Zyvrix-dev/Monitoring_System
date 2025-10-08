@@ -8,11 +8,13 @@ const normaliseApplications = (rawApplications) => {
       const pid = Number(app?.pid ?? app?.processId ?? app?.id);
       const cpu = Number(app?.cpu ?? app?.cpuPercent ?? app?.cpuUsage ?? 0);
       const memoryMb = Number(app?.memoryMb ?? app?.memory ?? app?.memoryUsage ?? 0);
+      const commandLine = String(app?.commandLine ?? app?.cmd ?? app?.command ?? '').trim();
       return {
         pid: Number.isFinite(pid) ? pid : 0,
         name: String(app?.name ?? app?.process ?? `PID ${pid}`),
         cpu,
-        memoryMb
+        memoryMb,
+        commandLine
       };
     })
     .filter((app) => app.name);

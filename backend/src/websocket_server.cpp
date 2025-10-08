@@ -222,7 +222,8 @@ void WebSocketServer::run() {
                                 {"pid", app.pid},
                                 {"name", app.name},
                                 {"cpu", app.cpuPercent},
-                                {"memoryMb", app.memoryMb}
+                                {"memoryMb", app.memoryMb},
+                                {"commandLine", app.commandLine}
                             });
                         }
                         j["domains"] = nlohmann::json::array();
