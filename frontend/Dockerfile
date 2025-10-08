@@ -6,6 +6,8 @@ WORKDIR /frontend
 COPY . .
 RUN npm install
 
+RUN npm audit fix --force
+
 RUN test -f public/index.html
 
 ENV HOST=0.0.0.0

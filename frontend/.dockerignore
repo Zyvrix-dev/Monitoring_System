@@ -7,3 +7,4 @@ pnpm-debug.log*
 .git
 .gitignore
 Dockerfile
+package-lock.json
