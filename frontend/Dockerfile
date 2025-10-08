@@ -1,12 +1,10 @@
 FROM node:20
 
-WORKDIR /app
+WORKDIR /frontend
 
-COPY package.json package-lock.json ./
-RUN npm ci
 
-COPY public ./public
-COPY src ./src
+COPY . .
+RUN npm install
 
 RUN test -f public/index.html
 

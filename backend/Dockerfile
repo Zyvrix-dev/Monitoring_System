@@ -18,14 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR / backend
 
 # Copy sources and CMake
-COPY src/ ./src/
-COPY CMakeLists.txt .
+COPY . .
 
 # Build
-RUN mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 .. && make -j$(nproc)
+RUN rm -rf build && mkdir build && cd build && cmake .. && make -j$(nproc)
+
 
 EXPOSE 8080 9002
 

@@ -1,0 +1,9 @@
+# prevent host build dir from being copied into the image
+build/
+dist/
+node_modules/
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+*.log
