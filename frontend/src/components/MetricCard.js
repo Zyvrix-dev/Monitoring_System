@@ -12,14 +12,32 @@ const trendLabel = {
   steady: 'Stable'
 };
 
-function MetricCard({ title, value, unit, helper, trend, status }) {
+function MetricCard({ title, value, unit, helper, trend, status, onSelect }) {
   const hasUnit = unit && unit.trim().length > 0;
   const visualStatus = status ? `metric-card--${status}` : 'metric-card--neutral';
   const formattedValue = value === null || value === undefined ? '--' : value;
   const showUnit = hasUnit && formattedValue !== '--';
+  const interactive = typeof onSelect === 'function';
+
+  const handleKeyDown = (event) => {
+    if (!interactive) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect();
+    }
+  };
 
   return (
-    <article className={`metric-card ${visualStatus}`}>
+    <article
+      className={`metric-card ${visualStatus} ${interactive ? 'metric-card--interactive' : ''}`}
+      onClick={interactive ? onSelect : undefined}
+      onKeyDown={handleKeyDown}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+    >
       <header className="metric-card__header">
         <p className="metric-card__title">{title}</p>
       </header>
@@ -40,6 +58,7 @@ function MetricCard({ title, value, unit, helper, trend, status }) {
           {trend.label}
         </p>
       )}
+      {interactive && <span className="metric-card__action">View details</span>}
     </article>
   );
 }
