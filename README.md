@@ -181,6 +181,7 @@ Open Grafana at http://localhost:3001 (login: `admin` / `admin`) to explore and 
 ## 🧾 License
 This project is open-source and available under the MIT License.
 
+## Screen Shots
 <img width="1900" height="944" alt="image" src="https://github.com/user-attachments/assets/113babba-49ef-4eba-a8d5-baf65f562701" />
 <img width="1900" height="938" alt="image" src="https://github.com/user-attachments/assets/f14e810f-a081-4d10-94ba-3c50fd2729f9" />
 <img width="1898" height="945" alt="image" src="https://github.com/user-attachments/assets/2c97b964-3d82-445f-92ea-36c4852e49a9" />
