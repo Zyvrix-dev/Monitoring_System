@@ -14,29 +14,31 @@ function ApplicationUsagePanel({ applications }) {
         </div>
       </div>
       {hasData ? (
-        <table className="detail-table" aria-label="Top application resource usage">
-          <thead>
-            <tr>
-              <th scope="col">Application</th>
-              <th scope="col">CPU</th>
-              <th scope="col">Memory</th>
-              <th scope="col">PID</th>
-            </tr>
-          </thead>
-          <tbody>
-            {applications.map((app) => (
-              <tr key={`${app.pid}-${app.name}`}>
-                <th scope="row">
-                  <div className="entity-name">{app.name || `Process ${app.pid}`}</div>
-                  <div className="entity-meta">PID {app.pid}</div>
-                </th>
-                <td>{formatPercentLabel(app.cpu)}</td>
-                <td>{formatMegabytes(app.memoryMb)}</td>
-                <td>{app.pid}</td>
+        <div className="panel__table-wrapper">
+          <table className="detail-table" aria-label="Top application resource usage">
+            <thead>
+              <tr>
+                <th scope="col">Application</th>
+                <th scope="col">CPU</th>
+                <th scope="col">Memory</th>
+                <th scope="col">PID</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {applications.map((app) => (
+                <tr key={`${app.pid}-${app.name}`}>
+                  <th scope="row">
+                    <div className="entity-name">{app.name || `Process ${app.pid}`}</div>
+                    <div className="entity-meta">PID {app.pid}</div>
+                  </th>
+                  <td>{formatPercentLabel(app.cpu)}</td>
+                  <td>{formatMegabytes(app.memoryMb)}</td>
+                  <td>{app.pid}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="panel__empty" role="status">
           <p>No processes sampled yet. Waiting for activity.</p>

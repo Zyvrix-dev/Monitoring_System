@@ -81,3 +81,56 @@ export const formatMegabytes = (value) => {
   return `${numeric.toFixed(1)} MB`;
 };
 
+const normaliseDate = (value) => {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+};
+
+export const formatDateTime = (value) => {
+  const date = normaliseDate(value);
+  if (!date) {
+    return '--';
+  }
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+};
+
+export const formatDuration = (start, end) => {
+  const startDate = normaliseDate(start);
+  const endDate = normaliseDate(end);
+  if (!startDate || !endDate) {
+    return '';
+  }
+
+  const diff = Math.max(0, endDate.getTime() - startDate.getTime());
+  const totalSeconds = Math.floor(diff / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts = [];
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+  if (seconds > 0 || parts.length === 0) {
+    parts.push(`${seconds}s`);
+  }
+
+  return parts.join(' ');
+};
+
