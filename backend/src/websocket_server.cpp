@@ -4,6 +4,7 @@
 
 // Include Boost beast/asio only in .cpp (limits macro/template exposure)
 #include <boost/asio.hpp>
+#include <boost/asio/error.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
@@ -193,7 +194,9 @@ void WebSocketServer::run() {
                         SystemMetrics m = this->collect_once();
                         nlohmann::json j;
                         j["cpu"] = m.cpuUsage;
+                        j["cpuAvg"] = m.cpuUsageAverage;
                         j["memory"] = m.memoryUsage;
+                        j["swap"] = m.swapUsage;
                         j["connections"] = m.activeConnections;
                         j["disk"] = m.diskUsage;
                         j["load1"] = m.loadAverage1;
@@ -201,7 +204,16 @@ void WebSocketServer::run() {
                         j["load15"] = m.loadAverage15;
                         j["netRx"] = m.networkReceiveRate;
                         j["netTx"] = m.networkTransmitRate;
+                        j["netRxAvg"] = m.networkReceiveRateAverage;
+                        j["netTxAvg"] = m.networkTransmitRateAverage;
                         j["cpuCores"] = m.cpuCount;
+                        j["processes"] = m.processCount;
+                        j["threads"] = m.threadCount;
+                        j["listeningTcp"] = m.listeningTcp;
+                        j["listeningUdp"] = m.listeningUdp;
+                        j["openFds"] = m.openFileDescriptors;
+                        j["uniqueDomains"] = m.uniqueDomains;
+                        j["dockerAvailable"] = m.dockerAvailable;
                         j["timestamp"] = MetricsCollector::to_iso8601(m.timestamp);
                         j["applications"] = nlohmann::json::array();
                         for (const auto &app : m.topApplications)
@@ -224,8 +236,41 @@ void WebSocketServer::run() {
                             });
                         }
 
-                        ws.write(net::buffer(j.dump()));
-                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                        j["dockerContainers"] = nlohmann::json::array();
+                        for (const auto &container : m.dockerContainers)
+                        {
+                            j["dockerContainers"].push_back({
+                                {"id", container.id},
+                                {"name", container.name},
+                                {"image", container.image},
+                                {"status", container.status}
+                            });
+                        }
+
+                        j["dockerImages"] = nlohmann::json::array();
+                        for (const auto &image : m.dockerImages)
+                        {
+                            j["dockerImages"].push_back({
+                                {"repository", image.repository},
+                                {"tag", image.tag},
+                                {"id", image.id},
+                                {"size", image.size}
+                            });
+                        }
+
+                        beast::error_code ec;
+                        ws.write(net::buffer(j.dump()), ec);
+                        if (ec)
+                        {
+                            if (ec == websocket::error::closed || ec == net::error::operation_aborted || ec == boost::asio::error::broken_pipe)
+                            {
+                                break;
+                            }
+                            std::cerr << "WebSocket session error: " << ec.message() << std::endl;
+                            break;
+                        }
+
+                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
                     }
                 } catch (const std::exception& e) {
                     // Session error — log and exit thread

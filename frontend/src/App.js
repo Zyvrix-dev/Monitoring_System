@@ -14,6 +14,8 @@ import { useMetricsHistory } from './hooks/useMetricsHistory';
 import { useSettings } from './hooks/useSettings';
 import { buildStatistics } from './utils/statistics';
 import DomainTrafficPanel from './components/DomainTrafficPanel';
+import SecurityOverview from './components/SecurityOverview';
+import DockerResourcesPanel from './components/DockerResourcesPanel';
 
 function App() {
   const { retentionSeconds, retentionDays, updateSetting } = useSettings();
@@ -106,6 +108,15 @@ function App() {
             domains={latestMetric?.domains ?? []}
             totalConnections={latestMetric?.connections}
             throughput={{ inbound: latestMetric?.netRx, outbound: latestMetric?.netTx }}
+          />
+        </section>
+
+        <section className="panel-grid panel-grid--balanced" aria-label="Security and developer tooling">
+          <SecurityOverview latestMetric={latestMetric} />
+          <DockerResourcesPanel
+            dockerAvailable={latestMetric?.dockerAvailable}
+            containers={latestMetric?.dockerContainers ?? []}
+            images={latestMetric?.dockerImages ?? []}
           />
         </section>
       </main>

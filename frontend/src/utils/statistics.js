@@ -7,7 +7,17 @@ const metricsToSummarise = [
   'load5',
   'load15',
   'netRx',
-  'netTx'
+  'netTx',
+  'cpuAvg',
+  'swap',
+  'netRxAvg',
+  'netTxAvg',
+  'processes',
+  'threads',
+  'listeningTcp',
+  'listeningUdp',
+  'openFds',
+  'uniqueDomains'
 ];
 
 const summariseValues = (values) => {
