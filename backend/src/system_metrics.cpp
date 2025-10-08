@@ -764,7 +764,17 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
     std::vector<DockerImageSummary> images;
 
     auto run_command = [](const char *cmd, std::vector<std::string> &lines) -> bool {
-        FILE *pipe = popen(cmd, "r");
+        if (cmd == nullptr)
+        {
+            return false;
+        }
+
+        std::string command(cmd);
+#ifndef _WIN32
+        command.append(" 2>/dev/null");
+#endif
+
+        FILE *pipe = popen(command.c_str(), "r");
         if (pipe == nullptr)
         {
             return false;
