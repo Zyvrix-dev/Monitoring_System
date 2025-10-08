@@ -1,17 +1,20 @@
 #include "rest_server.h"
+#include "server_config.h"
 #include "websocket_server.h"
-#include <thread>
+
 #include <iostream>
+#include <thread>
 
 int main()
 {
-    RestServer restServer("http://0.0.0.0:8080/metrics");
-    std::thread([&]
-                { restServer.start(); })
-        .detach();
+    const ServerConfig config = load_server_config();
 
-    WebSocketServer wsServer(9002);
-    std::cout << "WebSocket server running on ws://localhost:9002" << std::endl;
+    RestServer restServer(config.metrics_endpoint, config.api_token);
+    std::thread rest_thread([&restServer]() { restServer.start(); });
+    rest_thread.detach();
+
+    WebSocketServer wsServer(config.websocket_port, config.api_token, config.max_sessions);
+    std::cout << "WebSocket server running on ws://0.0.0.0:" << config.websocket_port << std::endl;
     wsServer.run();
 
     return 0;

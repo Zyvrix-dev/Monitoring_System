@@ -1,11 +1,16 @@
 FROM node:20
 
-WORKDIR /app
+WORKDIR /frontend
 
-COPY package.json package-lock.json ./
+
+COPY . .
 RUN npm install
 
-COPY src/ ./src/
+RUN npm audit fix --force
+
+RUN test -f public/index.html
+
+ENV HOST=0.0.0.0
 
 EXPOSE 3000
 

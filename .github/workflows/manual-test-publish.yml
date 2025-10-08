@@ -1,0 +1,181 @@
+name: Manual Test, Publish & Report
+
+on:
+  workflow_dispatch:
+
+jobs:
+  post-test-report:
+    name: Run Tests and Generate Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 🧪 Execute test pipeline and compile report
+        run: |
+          set -u -o pipefail
+
+          mkdir -p reports
+          report="reports/post-test-report.md"
+          echo "# Post-Test Report" > "${report}"
+          echo >> "${report}"
+
+          declare -a commands=(
+            "Install system dependencies|sudo apt-get update && sudo apt-get install -y build-essential cmake libboost-all-dev libssl-dev nlohmann-json3-dev libcpprest-dev"
+            "Configure backend|cmake -S backend -B backend/build"
+            "Build backend|cmake --build backend/build --config Release"
+            "Install frontend dependencies|cd frontend && npm ci"
+            "Build frontend|cd frontend && npm run build"
+          )
+
+          overall_status=0
+
+          for entry in "${commands[@]}"; do
+            IFS='|' read -r title command <<< "${entry}"
+            echo "## ${title}" | tee -a "${report}"
+            if bash -c "${command}"; then
+              echo "- Status: ✅ Success" | tee -a "${report}"
+            else
+              exit_code=$?
+              echo "- Status: ❌ Failure (exit code ${exit_code})" | tee -a "${report}"
+              overall_status=1
+            fi
+            echo >> "${report}"
+          done
+
+          exit ${overall_status}
+
+      - name: 🗂️ Upload post-test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-test-report
+          path: reports/post-test-report.md
+
+  publish-images:
+    name: Publish Docker Images
+    needs: post-test-report
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      HAS_DOCKERHUB_CREDS: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Log in to DockerHub
+        if: ${{ env.HAS_DOCKERHUB_CREDS == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: 📦 Build and push images
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+          HAS_DOCKERHUB_CREDS: ${{ env.HAS_DOCKERHUB_CREDS }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p reports
+          report="reports/image-publish.md"
+          echo "# Docker Image Publish Report" > "${report}"
+          echo >> "${report}"
+
+          images=(
+            "backend/Dockerfile monitoring-backend"
+            "frontend/Dockerfile monitoring-frontend"
+          )
+
+          for entry in "${images[@]}"; do
+            IFS=' ' read -r dockerfile image_name <<< "${entry}"
+            local_tag="${image_name}:ci"
+            echo "Building ${dockerfile} as ${local_tag}" | tee -a "${report}"
+            docker build -f "${dockerfile}" -t "${local_tag}" .
+
+            if [ "${HAS_DOCKERHUB_CREDS}" = "true" ]; then
+              remote_tag="${DOCKERHUB_USERNAME}/${image_name}:latest"
+              echo "Pushing ${remote_tag}" | tee -a "${report}"
+              docker tag "${local_tag}" "${remote_tag}"
+              docker push "${remote_tag}"
+            else
+              echo "Skipping push for ${image_name}; DockerHub credentials not available." | tee -a "${report}"
+            fi
+
+            echo >> "${report}"
+          done
+
+      - name: 🗂️ Upload image publish report
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-publish-report
+          path: reports/image-publish.md
+
+  final-report:
+    name: Final Workflow Report
+    needs: publish-images
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Download post-test report
+        uses: actions/download-artifact@v4
+        with:
+          name: post-test-report
+          path: collected/post-test
+          merge-multiple: true
+
+      - name: 📥 Download image publish report
+        uses: actions/download-artifact@v4
+        with:
+          name: image-publish-report
+          path: collected/publish
+          merge-multiple: true
+
+      - name: 📝 Compile final workflow report
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          summary="reports/final-workflow-report.md"
+
+          {
+            echo "# Final Workflow Report"
+            echo
+            echo "## Test Summary"
+            post_test_report=$(find collected/post-test -name 'post-test-report.md' -print -quit)
+            if [ -n "${post_test_report}" ]; then
+              cat "${post_test_report}"
+            fi
+            echo
+            echo "## Docker Image Publication"
+            image_publish_report=$(find collected/publish -name 'image-publish.md' -print -quit)
+            if [ -n "${image_publish_report}" ]; then
+              cat "${image_publish_report}"
+            fi
+          } > "${summary}"
+
+      - name: 🗂️ Upload final workflow report
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-workflow-report
+          path: reports/final-workflow-report.md
+
+      - name: 📧 Email final workflow report
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.REPORT_EMAIL_SERVER }}
+          server_port: ${{ secrets.REPORT_EMAIL_PORT }}
+          username: ${{ secrets.REPORT_EMAIL_USERNAME }}
+          password: ${{ secrets.REPORT_EMAIL_PASSWORD }}
+          subject: "Final Workflow Report"
+          to: ${{ secrets.REPORT_EMAIL_TO }}
+          from: ${{ secrets.REPORT_EMAIL_FROM }}
+          body: |
+            All automated tests and Docker image publication tasks have completed. The final consolidated report is attached.
+          attachments: reports/final-workflow-report.md
