@@ -661,6 +661,80 @@ a {
   color: var(--text-surface-muted);
 }
 
+.application-usage__controls {
+  margin: 16px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.application-usage__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.application-usage__filter {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-surface-muted);
+  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.application-usage__filter:hover,
+.application-usage__filter:focus {
+  background: rgba(99, 102, 241, 0.16);
+  transform: translateY(-1px);
+  color: var(--text-surface);
+}
+
+.application-usage__filter:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.application-usage__filter--active,
+.application-usage__filter--active:hover,
+.application-usage__filter--active:focus {
+  background: rgba(99, 102, 241, 0.22);
+  color: var(--text-surface);
+}
+
+.application-usage__filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(148, 163, 184, 0.25);
+  color: var(--text-surface-muted);
+}
+
+.application-usage__filter--active .application-usage__filter-count {
+  background: rgba(99, 102, 241, 0.3);
+  color: var(--text-surface);
+}
+
+.application-usage__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-surface-muted);
+}
+
 .detail-table {
   width: 100%;
   border-collapse: collapse;
@@ -697,6 +771,15 @@ a {
   margin-top: 4px;
   font-size: 0.8rem;
   color: var(--text-surface-muted);
+}
+
+.entity-meta__command {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--text-surface-muted);
+  word-break: break-word;
+  white-space: normal;
 }
 
 .panel__empty {
