@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 
 import {
   formatConnections,
@@ -7,14 +7,18 @@ import {
   formatMegabytes,
   formatPercentLabel,
   formatThroughput,
-  formatThroughputPair
-} from '../utils/formatters';
+  formatThroughputPair,
+} from "../utils/formatters";
 
 const formatRangeLabel = (range) => {
-  const startLabel = range?.start ? formatDateTime(range.start) : 'Unknown start';
-  const endLabel = range?.end ? formatDateTime(range.end) : 'Unknown end';
+  const startLabel = range?.start
+    ? formatDateTime(range.start)
+    : "Unknown start";
+  const endLabel = range?.end ? formatDateTime(range.end) : "Unknown end";
   const durationLabel = formatDuration(range?.start, range?.end);
-  return `${startLabel} → ${endLabel}${durationLabel ? ` · ${durationLabel}` : ''}`;
+  return `${startLabel} → ${endLabel}${
+    durationLabel ? ` · ${durationLabel}` : ""
+  }`;
 };
 
 const renderStat = (label, value) => (
@@ -31,21 +35,28 @@ const renderStatGroup = (stats) => {
 
   return (
     <div className="history-panel__stats-grid">
-      {renderStat('CPU avg', formatPercentLabel(stats.cpu?.avg))}
-      {renderStat('CPU peak', formatPercentLabel(stats.cpu?.peak))}
-      {renderStat('Memory avg', formatPercentLabel(stats.memory?.avg))}
-      {renderStat('Memory peak', formatPercentLabel(stats.memory?.peak))}
-      {renderStat('Disk peak', formatPercentLabel(stats.disk?.peak))}
-      {renderStat('Connections peak', formatConnections(stats.connections?.peak))}
-      {renderStat('Network inbound peak', formatThroughput(stats.netRx?.peak))}
-      {renderStat('Network outbound peak', formatThroughput(stats.netTx?.peak))}
+      {renderStat("CPU avg", formatPercentLabel(stats.cpu?.avg))}
+      {renderStat("CPU peak", formatPercentLabel(stats.cpu?.peak))}
+      {renderStat("Memory avg", formatPercentLabel(stats.memory?.avg))}
+      {renderStat("Memory peak", formatPercentLabel(stats.memory?.peak))}
+      {renderStat("Disk peak", formatPercentLabel(stats.disk?.peak))}
+      {renderStat(
+        "Connections peak",
+        formatConnections(stats.connections?.peak)
+      )}
+      {renderStat("Network inbound peak", formatThroughput(stats.netRx?.peak))}
+      {renderStat("Network outbound peak", formatThroughput(stats.netTx?.peak))}
     </div>
   );
 };
 
 const renderApplications = (applications) => {
   if (!Array.isArray(applications) || applications.length === 0) {
-    return <p className="history-panel__empty-row">No application data was captured in this snapshot.</p>;
+    return (
+      <p className="history-panel__empty-row">
+        No application data was captured in this snapshot.
+      </p>
+    );
   }
 
   return (
@@ -63,7 +74,9 @@ const renderApplications = (applications) => {
           {applications.map((app) => (
             <tr key={`${app.pid}-${app.name}`}>
               <th scope="row">
-                <div className="entity-name">{app.name || `Process ${app.pid}`}</div>
+                <div className="entity-name">
+                  {app.name || `Process ${app.pid}`}
+                </div>
                 <div className="entity-meta">PID {app.pid}</div>
               </th>
               <td>{formatPercentLabel(app.cpu)}</td>
@@ -79,7 +92,11 @@ const renderApplications = (applications) => {
 
 const renderDomains = (domains) => {
   if (!Array.isArray(domains) || domains.length === 0) {
-    return <p className="history-panel__empty-row">No remote domains were observed for this snapshot.</p>;
+    return (
+      <p className="history-panel__empty-row">
+        No remote domains were observed for this snapshot.
+      </p>
+    );
   }
 
   return (
@@ -98,7 +115,9 @@ const renderDomains = (domains) => {
             <tr key={`${domain.domain}-${domain.connections}`}>
               <th scope="row">
                 <div className="entity-name">{domain.domain}</div>
-                <div className="entity-meta">{formatConnections(domain.connections)} connections</div>
+                <div className="entity-meta">
+                  {formatConnections(domain.connections)} connections
+                </div>
               </th>
               <td>{formatConnections(domain.connections)}</td>
               <td>{formatThroughput(domain.receiveRate)}</td>
@@ -117,7 +136,7 @@ function HistoryPanel({
   snapshots,
   onDeleteSnapshot,
   onClearSnapshots,
-  onExportSnapshot
+  onExportSnapshot,
 }) {
   useEffect(() => {
     if (!open) {
@@ -125,20 +144,27 @@ function HistoryPanel({
     }
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, onClose]);
 
   return (
-    <div className={`history-panel ${open ? 'history-panel--open' : ''}`} aria-hidden={!open}>
-      <div className="history-panel__backdrop" role="presentation" onClick={onClose} />
+    <div
+      className={`history-panel ${open ? "history-panel--open" : ""}`}
+      aria-hidden={!open}
+    >
+      <div
+        className="history-panel__backdrop"
+        role="presentation"
+        onClick={onClose}
+      />
       <aside
         className="history-panel__surface"
         role="dialog"
@@ -150,8 +176,9 @@ function HistoryPanel({
             <p className="history-panel__eyebrow">Historical snapshots</p>
             <h2 id="history-panel-title">Telemetry history</h2>
             <p className="history-panel__summary">
-              Saved datasets capture the full application list, network domains and raw samples from the live stream.
-              Export entries for offline analysis or remove them to reclaim local storage.
+              Saved datasets capture the full application list, network domains
+              and raw samples from the live stream. Export entries for offline
+              analysis or remove them to reclaim local storage.
             </p>
           </div>
           <div className="history-panel__actions">
@@ -163,7 +190,11 @@ function HistoryPanel({
             >
               Clear all
             </button>
-            <button type="button" className="history-panel__close" onClick={onClose}>
+            <button
+              type="button"
+              className="history-panel__close"
+              onClick={onClose}
+            >
               Close
             </button>
           </div>
@@ -179,22 +210,40 @@ function HistoryPanel({
                       <p>{formatRangeLabel(snapshot.range)}</p>
                     </div>
                     <div className="history-panel__item-meta">
-                      <span>{snapshot.sampleCount.toLocaleString()} samples</span>
-                      <span>{formatThroughputPair(snapshot.latestMetric?.netRx, snapshot.latestMetric?.netTx)}</span>
+                      <span>
+                        {snapshot.sampleCount.toLocaleString()} samples
+                      </span>
+                      <span>
+                        {formatThroughputPair(
+                          snapshot.latestMetric?.netRx,
+                          snapshot.latestMetric?.netTx
+                        )}
+                      </span>
                     </div>
                   </header>
 
-                  <section aria-label="Resource summary" className="history-panel__section">
+                  <section
+                    aria-label="Resource summary"
+                    className="history-panel__section"
+                  >
                     <h4>Resource summary</h4>
-                    <dl className="history-panel__stats">{renderStatGroup(snapshot.stats)}</dl>
+                    <dl className="history-panel__stats">
+                      {renderStatGroup(snapshot.stats)}
+                    </dl>
                   </section>
 
-                  <section aria-label="Application utilisation" className="history-panel__section">
+                  <section
+                    aria-label="Application utilisation"
+                    className="history-panel__section"
+                  >
                     <h4>Application utilisation</h4>
                     {renderApplications(snapshot.applications)}
                   </section>
 
-                  <section aria-label="Network domains" className="history-panel__section">
+                  <section
+                    aria-label="Network domains"
+                    className="history-panel__section"
+                  >
                     <h4>Observed domains</h4>
                     {renderDomains(snapshot.domains)}
                   </section>
@@ -222,7 +271,10 @@ function HistoryPanel({
             </ul>
           ) : (
             <div className="history-panel__empty" role="status">
-              <p>No snapshots captured yet. Use the “Save snapshot” action in the dashboard header to archive the current session.</p>
+              <p>
+                No snapshots captured yet. Use the “Save snapshot” action in the
+                dashboard header to archive the current session.
+              </p>
             </div>
           )}
         </div>
@@ -232,4 +284,3 @@ function HistoryPanel({
 }
 
 export default HistoryPanel;
-

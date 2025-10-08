@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo } from "react";
 
-import { generateOptimizationInsights } from '../utils/insights';
+import { generateOptimizationInsights } from "../utils/insights";
 
 const severityIcon = {
-  critical: '⛔',
-  warning: '⚠️',
-  info: 'ℹ️',
-  success: '✅'
+  critical: "⛔",
+  warning: "⚠️",
+  info: "ℹ️",
+  success: "✅",
 };
 
 function OptimizationInsightsPanel({ latestMetric, stats }) {
@@ -22,7 +22,9 @@ function OptimizationInsightsPanel({ latestMetric, stats }) {
       <div className="panel__header">
         <div>
           <h2>Optimisation coach</h2>
-          <p>Actionable guidance derived from the most recent performance sample.</p>
+          <p>
+            Actionable guidance derived from the most recent performance sample.
+          </p>
         </div>
       </div>
       {hasInsights ? (
@@ -37,7 +39,9 @@ function OptimizationInsightsPanel({ latestMetric, stats }) {
               </div>
               <div className="insight-list__content">
                 <h3 className="insight-list__title">{insight.title}</h3>
-                <p className="insight-list__description">{insight.description}</p>
+                <p className="insight-list__description">
+                  {insight.description}
+                </p>
                 {insight.actions.length > 0 && (
                   <ul className="insight-actions">
                     {insight.actions.map((action) => (
@@ -51,7 +55,10 @@ function OptimizationInsightsPanel({ latestMetric, stats }) {
         </ul>
       ) : (
         <div className="panel__empty" role="status">
-          <p>No optimisation insights available yet. Capture more samples to build recommendations.</p>
+          <p>
+            No optimisation insights available yet. Capture more samples to
+            build recommendations.
+          </p>
         </div>
       )}
     </article>
@@ -59,4 +66,3 @@ function OptimizationInsightsPanel({ latestMetric, stats }) {
 }
 
 export default OptimizationInsightsPanel;
-

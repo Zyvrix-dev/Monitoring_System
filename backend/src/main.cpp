@@ -10,7 +10,8 @@ int main()
     const ServerConfig config = load_server_config();
 
     RestServer restServer(config.metrics_endpoint, config.api_token);
-    std::thread rest_thread([&restServer]() { restServer.start(); });
+    std::thread rest_thread([&restServer]()
+                            { restServer.start(); });
     rest_thread.detach();
 
     WebSocketServer wsServer(config.websocket_port, config.api_token, config.max_sessions);

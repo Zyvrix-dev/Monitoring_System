@@ -1,9 +1,16 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-import { appConfig } from '../config';
+import { appConfig } from "../config";
 
 const SettingsContext = createContext(undefined);
-const STORAGE_KEY = 'monitoring.settings.v1';
+const STORAGE_KEY = "monitoring.settings.v1";
 
 const clampRetentionDays = (value) => {
   const numeric = Number(value);
@@ -14,11 +21,11 @@ const clampRetentionDays = (value) => {
 };
 
 const defaultSettings = {
-  retentionDays: appConfig.defaultRetentionDays
+  retentionDays: appConfig.defaultRetentionDays,
 };
 
 const readStoredSettings = () => {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  if (typeof window === "undefined" || !window.localStorage) {
     return defaultSettings;
   }
 
@@ -28,11 +35,11 @@ const readStoredSettings = () => {
       return defaultSettings;
     }
     const parsed = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) {
+    if (typeof parsed !== "object" || parsed === null) {
       return defaultSettings;
     }
     return {
-      retentionDays: clampRetentionDays(parsed.retentionDays)
+      retentionDays: clampRetentionDays(parsed.retentionDays),
     };
   } catch (error) {
     return defaultSettings;
@@ -43,7 +50,7 @@ export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState(() => readStoredSettings());
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.localStorage) {
+    if (typeof window === "undefined" || !window.localStorage) {
       return;
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -51,7 +58,8 @@ export const SettingsProvider = ({ children }) => {
 
   const updateSetting = useCallback((key, value) => {
     setSettings((previous) => {
-      const nextValue = key === 'retentionDays' ? clampRetentionDays(value) : value;
+      const nextValue =
+        key === "retentionDays" ? clampRetentionDays(value) : value;
       if (previous[key] === nextValue) {
         return previous;
       }
@@ -68,19 +76,22 @@ export const SettingsProvider = ({ children }) => {
       settings,
       retentionSeconds,
       retentionDays: settings.retentionDays,
-      updateSetting
+      updateSetting,
     }),
     [settings, retentionSeconds, updateSetting]
   );
 
-  return <SettingsContext.Provider value={contextValue}>{children}</SettingsContext.Provider>;
+  return (
+    <SettingsContext.Provider value={contextValue}>
+      {children}
+    </SettingsContext.Provider>
+  );
 };
 
 export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) {
-    throw new Error('useSettings must be used within a SettingsProvider');
+    throw new Error("useSettings must be used within a SettingsProvider");
   }
   return context;
 };
-

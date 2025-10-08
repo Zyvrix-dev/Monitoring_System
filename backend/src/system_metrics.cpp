@@ -31,76 +31,54 @@
 
 namespace
 {
-constexpr const char *PROC_STAT_PATH = "/proc/stat";
-constexpr const char *PROC_MEMINFO_PATH = "/proc/meminfo";
-constexpr const char *PROC_TCP4_PATH = "/proc/net/tcp";
-constexpr const char *PROC_TCP6_PATH = "/proc/net/tcp6";
-constexpr const char *PROC_UDP4_PATH = "/proc/net/udp";
-constexpr const char *PROC_UDP6_PATH = "/proc/net/udp6";
-constexpr const char *PROC_NET_DEV_PATH = "/proc/net/dev";
-constexpr auto CPU_AVERAGE_WINDOW = std::chrono::seconds(60);
-constexpr auto NETWORK_AVERAGE_WINDOW = std::chrono::seconds(30);
-constexpr auto MIN_COLLECTION_INTERVAL = std::chrono::milliseconds(400);
-bool is_active_tcp_state(int state)
-{
-    switch (state)
+    constexpr const char *PROC_STAT_PATH = "/proc/stat";
+    constexpr const char *PROC_MEMINFO_PATH = "/proc/meminfo";
+    constexpr const char *PROC_TCP4_PATH = "/proc/net/tcp";
+    constexpr const char *PROC_TCP6_PATH = "/proc/net/tcp6";
+    constexpr const char *PROC_UDP4_PATH = "/proc/net/udp";
+    constexpr const char *PROC_UDP6_PATH = "/proc/net/udp6";
+    constexpr const char *PROC_NET_DEV_PATH = "/proc/net/dev";
+    constexpr auto CPU_AVERAGE_WINDOW = std::chrono::seconds(60);
+    constexpr auto NETWORK_AVERAGE_WINDOW = std::chrono::seconds(30);
+    constexpr auto MIN_COLLECTION_INTERVAL = std::chrono::milliseconds(400);
+    bool is_active_tcp_state(int state)
     {
-    case 0x01: // ESTABLISHED
-    case 0x02: // SYN_SENT
-    case 0x03: // SYN_RECV
-    case 0x04: // FIN_WAIT1
-    case 0x05: // FIN_WAIT2
-    case 0x06: // TIME_WAIT
-    case 0x08: // CLOSE_WAIT
-    case 0x09: // LAST_ACK
-    case 0x0B: // CLOSING
-    case 0x0C: // NEW_SYN_RECV
-        return true;
-    default:
-        return false;
-    }
-}
-
-std::string decode_ipv4_address(const std::string &hex)
-{
-    if (hex.size() != 8)
-    {
-        return "unknown";
+        switch (state)
+        {
+        case 0x01: // ESTABLISHED
+        case 0x02: // SYN_SENT
+        case 0x03: // SYN_RECV
+        case 0x04: // FIN_WAIT1
+        case 0x05: // FIN_WAIT2
+        case 0x06: // TIME_WAIT
+        case 0x08: // CLOSE_WAIT
+        case 0x09: // LAST_ACK
+        case 0x0B: // CLOSING
+        case 0x0C: // NEW_SYN_RECV
+            return true;
+        default:
+            return false;
+        }
     }
 
-    try
+    std::string decode_ipv4_address(const std::string &hex)
     {
-        unsigned long value = std::stoul(hex, nullptr, 16);
-        in_addr addr{};
-        addr.s_addr = htonl(static_cast<uint32_t>(value));
-        char buffer[INET_ADDRSTRLEN];
-        if (inet_ntop(AF_INET, &addr, buffer, sizeof(buffer)) == nullptr)
+        if (hex.size() != 8)
         {
             return "unknown";
         }
-        return buffer;
-    }
-    catch (const std::exception &)
-    {
-        return "unknown";
-    }
-}
 
-std::string decode_ipv6_address(const std::string &hex)
-{
-    if (hex.size() != 32)
-    {
-        return "unknown";
-    }
-
-    std::array<unsigned char, 16> raw{};
-    for (std::size_t i = 0; i < raw.size(); ++i)
-    {
-        const std::size_t index = i * 2;
-        const std::string byte_str = hex.substr(index, 2);
         try
         {
-            raw[i] = static_cast<unsigned char>(std::stoul(byte_str, nullptr, 16));
+            unsigned long value = std::stoul(hex, nullptr, 16);
+            in_addr addr{};
+            addr.s_addr = htonl(static_cast<uint32_t>(value));
+            char buffer[INET_ADDRSTRLEN];
+            if (inet_ntop(AF_INET, &addr, buffer, sizeof(buffer)) == nullptr)
+            {
+                return "unknown";
+            }
+            return buffer;
         }
         catch (const std::exception &)
         {
@@ -108,22 +86,44 @@ std::string decode_ipv6_address(const std::string &hex)
         }
     }
 
-    std::array<unsigned char, 16> reordered{};
-    for (std::size_t chunk = 0; chunk < 4; ++chunk)
+    std::string decode_ipv6_address(const std::string &hex)
     {
-        reordered[chunk * 4 + 0] = raw[chunk * 4 + 3];
-        reordered[chunk * 4 + 1] = raw[chunk * 4 + 2];
-        reordered[chunk * 4 + 2] = raw[chunk * 4 + 1];
-        reordered[chunk * 4 + 3] = raw[chunk * 4 + 0];
-    }
+        if (hex.size() != 32)
+        {
+            return "unknown";
+        }
 
-    char buffer[INET6_ADDRSTRLEN];
-    if (inet_ntop(AF_INET6, reordered.data(), buffer, sizeof(buffer)) == nullptr)
-    {
-        return "unknown";
+        std::array<unsigned char, 16> raw{};
+        for (std::size_t i = 0; i < raw.size(); ++i)
+        {
+            const std::size_t index = i * 2;
+            const std::string byte_str = hex.substr(index, 2);
+            try
+            {
+                raw[i] = static_cast<unsigned char>(std::stoul(byte_str, nullptr, 16));
+            }
+            catch (const std::exception &)
+            {
+                return "unknown";
+            }
+        }
+
+        std::array<unsigned char, 16> reordered{};
+        for (std::size_t chunk = 0; chunk < 4; ++chunk)
+        {
+            reordered[chunk * 4 + 0] = raw[chunk * 4 + 3];
+            reordered[chunk * 4 + 1] = raw[chunk * 4 + 2];
+            reordered[chunk * 4 + 2] = raw[chunk * 4 + 1];
+            reordered[chunk * 4 + 3] = raw[chunk * 4 + 0];
+        }
+
+        char buffer[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, reordered.data(), buffer, sizeof(buffer)) == nullptr)
+        {
+            return "unknown";
+        }
+        return buffer;
     }
-    return buffer;
-}
 
 } // namespace
 
@@ -340,9 +340,7 @@ double MetricsCollector::read_swap_usage()
 
 double MetricsCollector::read_disk_usage()
 {
-    struct statvfs fs_stats
-    {
-    };
+    struct statvfs fs_stats{};
     if (statvfs("/", &fs_stats) != 0)
     {
         return 0.0;
@@ -441,7 +439,8 @@ void MetricsCollector::update_rollup_samples(double cpu, double rx, double tx, c
 {
     auto push_sample = [&now](std::deque<std::pair<std::chrono::steady_clock::time_point, double>> &samples,
                               double value,
-                              const std::chrono::steady_clock::duration &window) {
+                              const std::chrono::steady_clock::duration &window)
+    {
         if (!std::isfinite(value))
         {
             return;
@@ -474,7 +473,8 @@ double MetricsCollector::compute_average(std::deque<std::pair<std::chrono::stead
     }
 
     const double sum = std::accumulate(samples.begin(), samples.end(), 0.0,
-                                       [](double total, const auto &entry) {
+                                       [](double total, const auto &entry)
+                                       {
                                            return total + entry.second;
                                        });
     return sum / static_cast<double>(samples.size());
@@ -608,7 +608,8 @@ std::vector<ApplicationUsage> MetricsCollector::read_application_usage()
     closedir(proc_dir);
     process_cpu_times_ = std::move(next_cpu_times);
 
-    std::sort(result.begin(), result.end(), [](const ApplicationUsage &lhs, const ApplicationUsage &rhs) {
+    std::sort(result.begin(), result.end(), [](const ApplicationUsage &lhs, const ApplicationUsage &rhs)
+              {
         if (std::abs(lhs.cpuPercent - rhs.cpuPercent) > 0.0001)
         {
             return lhs.cpuPercent > rhs.cpuPercent;
@@ -617,8 +618,7 @@ std::vector<ApplicationUsage> MetricsCollector::read_application_usage()
         {
             return lhs.memoryMb > rhs.memoryMb;
         }
-        return lhs.pid < rhs.pid;
-    });
+        return lhs.pid < rhs.pid; });
 
     return result;
 }
@@ -671,7 +671,8 @@ std::pair<unsigned int, unsigned int> MetricsCollector::read_process_thread_coun
 
 std::pair<unsigned int, unsigned int> MetricsCollector::read_listening_ports() const
 {
-    auto count_listening = [](const std::string &path, bool tcp) {
+    auto count_listening = [](const std::string &path, bool tcp)
+    {
         std::ifstream file(path);
         if (!file.is_open())
         {
@@ -763,7 +764,8 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
     std::vector<DockerContainerSummary> containers;
     std::vector<DockerImageSummary> images;
 
-    auto run_command = [](const char *cmd, std::vector<std::string> &lines) -> bool {
+    auto run_command = [](const char *cmd, std::vector<std::string> &lines) -> bool
+    {
         if (cmd == nullptr)
         {
             return false;
@@ -808,7 +810,8 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
 #endif
     };
 
-    auto trim = [](const std::string &value) -> std::string {
+    auto trim = [](const std::string &value) -> std::string
+    {
         const char *whitespace = " \t\r\n";
         const std::size_t begin = value.find_first_not_of(whitespace);
         if (begin == std::string::npos)
@@ -819,9 +822,12 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
         return value.substr(begin, end - begin + 1);
     };
 
-    auto parse_percent = [](const std::string &value) -> double {
+    auto parse_percent = [](const std::string &value) -> double
+    {
         std::string trimmed = value;
-        trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), [](unsigned char ch) { return std::isspace(ch); }), trimmed.end());
+        trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), [](unsigned char ch)
+                                     { return std::isspace(ch); }),
+                      trimmed.end());
         if (!trimmed.empty() && trimmed.back() == '%')
         {
             trimmed.pop_back();
@@ -840,7 +846,8 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
         }
     };
 
-    auto parse_bytes = [&trim](const std::string &value) -> double {
+    auto parse_bytes = [&trim](const std::string &value) -> double
+    {
         std::string trimmed = trim(value);
         if (trimmed.empty() || trimmed == "--")
         {
@@ -869,7 +876,8 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
         }
 
         std::string unit = trim(trimmed.substr(index));
-        std::transform(unit.begin(), unit.end(), unit.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        std::transform(unit.begin(), unit.end(), unit.begin(), [](unsigned char ch)
+                       { return static_cast<char>(std::tolower(ch)); });
 
         if (unit.empty() || unit == "b")
         {
@@ -895,15 +903,18 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
         return numeric;
     };
 
-    auto parse_mb = [&parse_bytes](const std::string &value) -> double {
+    auto parse_mb = [&parse_bytes](const std::string &value) -> double
+    {
         return parse_bytes(value) / (1024.0 * 1024.0);
     };
 
-    auto parse_kb = [&parse_bytes](const std::string &value) -> double {
+    auto parse_kb = [&parse_bytes](const std::string &value) -> double
+    {
         return parse_bytes(value) / 1024.0;
     };
 
-    auto parse_io_pair = [&](const std::string &value) -> std::pair<double, double> {
+    auto parse_io_pair = [&](const std::string &value) -> std::pair<double, double>
+    {
         const std::size_t slash = value.find('/');
         if (slash == std::string::npos)
         {
@@ -1031,13 +1042,13 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
         containers.push_back(std::move(entry.second));
     }
 
-    std::sort(containers.begin(), containers.end(), [](const DockerContainerSummary &lhs, const DockerContainerSummary &rhs) {
+    std::sort(containers.begin(), containers.end(), [](const DockerContainerSummary &lhs, const DockerContainerSummary &rhs)
+              {
         if (lhs.name != rhs.name)
         {
             return lhs.name < rhs.name;
         }
-        return lhs.id < rhs.id;
-    });
+        return lhs.id < rhs.id; });
 
     std::vector<std::string> image_lines;
     if (run_command("docker images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.Size}}'", image_lines))
@@ -1124,7 +1135,8 @@ MetricsCollector::ConnectionSummary MetricsCollector::read_connection_summary()
     ConnectionSummary summary{};
     summary.totalConnections = 0;
 
-    auto parse_tcp_file = [this, &summary](const std::string &path, bool ipv6) {
+    auto parse_tcp_file = [this, &summary](const std::string &path, bool ipv6)
+    {
         std::ifstream tcp_file(path);
         if (!tcp_file.is_open())
         {
@@ -1207,7 +1219,8 @@ std::vector<DomainUsage> MetricsCollector::build_domain_usage(const ConnectionSu
         result.push_back(std::move(usage));
     }
 
-    std::sort(result.begin(), result.end(), [](const DomainUsage &lhs, const DomainUsage &rhs) {
+    std::sort(result.begin(), result.end(), [](const DomainUsage &lhs, const DomainUsage &rhs)
+              {
         if (lhs.connections != rhs.connections)
         {
             return lhs.connections > rhs.connections;
@@ -1216,8 +1229,7 @@ std::vector<DomainUsage> MetricsCollector::build_domain_usage(const ConnectionSu
         {
             return lhs.receiveRate > rhs.receiveRate;
         }
-        return lhs.domain < rhs.domain;
-    });
+        return lhs.domain < rhs.domain; });
 
     return result;
 }

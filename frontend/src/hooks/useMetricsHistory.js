@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from "react";
 
-const STORAGE_KEY = 'monitoring.history.snapshots.v1';
+const STORAGE_KEY = "monitoring.history.snapshots.v1";
 const MAX_SNAPSHOTS = 25;
 
 const cloneValue = (value) => {
@@ -12,7 +12,7 @@ const cloneValue = (value) => {
 };
 
 const readStoredSnapshots = () => {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  if (typeof window === "undefined" || !window.localStorage) {
     return [];
   }
 
@@ -32,7 +32,7 @@ const readStoredSnapshots = () => {
 };
 
 const persistSnapshots = (snapshots) => {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  if (typeof window === "undefined" || !window.localStorage) {
     return;
   }
 
@@ -57,7 +57,7 @@ const createSnapshot = (metrics, latestMetric, stats) => {
 
   const range = {
     start: first?.timestamp ?? null,
-    end: last?.timestamp ?? null
+    end: last?.timestamp ?? null,
   };
 
   return {
@@ -69,7 +69,7 @@ const createSnapshot = (metrics, latestMetric, stats) => {
     latestMetric: safeLatest,
     applications: cloneValue(safeLatest?.applications ?? []),
     domains: cloneValue(safeLatest?.domains ?? []),
-    metrics: clonedMetrics
+    metrics: clonedMetrics,
   };
 };
 
@@ -110,17 +110,21 @@ export const useMetricsHistory = ({ metrics, latestMetric, stats }) => {
   }, []);
 
   const exportSnapshot = useCallback((snapshot) => {
-    if (typeof window === 'undefined' || typeof document === 'undefined' || !snapshot) {
+    if (
+      typeof window === "undefined" ||
+      typeof document === "undefined" ||
+      !snapshot
+    ) {
       return;
     }
 
     const data = JSON.stringify(snapshot, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
+    const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
-    const anchor = document.createElement('a');
+    const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${snapshot.id || 'snapshot'}.json`;
+    anchor.download = `${snapshot.id || "snapshot"}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -144,7 +148,6 @@ export const useMetricsHistory = ({ metrics, latestMetric, stats }) => {
     saveSnapshot,
     deleteSnapshot,
     clearSnapshots,
-    exportSnapshot
+    exportSnapshot,
   };
 };
-
