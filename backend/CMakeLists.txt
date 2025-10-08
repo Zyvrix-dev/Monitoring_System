@@ -37,6 +37,8 @@ set(SRC_FILES
     src/system_metrics.cpp
     src/rest_server.cpp
     src/websocket_server.cpp
+    src/server_config.cpp
+    src/token_utils.cpp
 )
 
 add_executable(cpp_monitor ${SRC_FILES})

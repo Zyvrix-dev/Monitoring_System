@@ -1,5 +1,7 @@
 #include "websocket_server.h"
 
+#include "token_utils.h"
+
 // Include Boost beast/asio only in .cpp (limits macro/template exposure)
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
@@ -10,11 +12,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <functional>
-#include <memory>
-#include <thread>
 #include <iostream>
-#include <unordered_map>
+#include <memory>
 #include <sstream>
+#include <thread>
+#include <unordered_map>
 
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
@@ -81,20 +83,6 @@ std::unordered_map<std::string, std::string> parse_query_string(beast::string_vi
     return params;
 }
 
-bool constant_time_equals(const std::string &lhs, const std::string &rhs)
-{
-    if (lhs.size() != rhs.size())
-    {
-        return false;
-    }
-
-    unsigned char result = 0;
-    for (std::size_t i = 0; i < lhs.size(); ++i)
-    {
-        result |= static_cast<unsigned char>(lhs[i] ^ rhs[i]);
-    }
-    return result == 0;
-}
 }
 
 WebSocketServer::WebSocketServer(unsigned short port, std::string apiToken, std::size_t maxSessions)
@@ -117,7 +105,7 @@ bool WebSocketServer::is_token_valid(const std::string &provided) const
         return false;
     }
 
-    return constant_time_equals(provided, api_token_);
+    return security::tokens_equal(provided, api_token_);
 }
 
 void WebSocketServer::run() {
@@ -203,7 +191,3 @@ void WebSocketServer::run() {
     }
 }
 
-// Unused placeholder to match header signature (keeps header simple)
-void WebSocketServer::handle_session(void* /*socket_placeholder*/) {
-    // implementation lives in run() above (we used lambda threads there)
-}
