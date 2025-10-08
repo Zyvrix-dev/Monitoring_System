@@ -66,6 +66,23 @@ Install the following tools depending on how you would like to run the system:
 
 ---
 
+## 📈 Metrics Collection & Calculations
+The C++ telemetry agent samples Linux kernel statistics roughly every 900 ms and caches the most recent snapshot to reduce disk churn. The metrics that surface through the REST and WebSocket APIs are computed as follows:
+
+| Metric | Data Source | Calculation Details |
+| --- | --- | --- |
+| **CPU Usage (%)** | `/proc/stat` | Parses the aggregated `cpu` line to gather user, nice, system, idle, iowait, irq, softirq, and steal jiffies. The collector retains the previous totals and reports `((totalΔ − idleΔ) / totalΔ) × 100`, clamped between 0–100%. |
+| **Memory Usage (%)** | `/proc/meminfo` | Reads the `MemTotal` and `MemAvailable` fields and computes `(MemTotal − MemAvailable) / MemTotal × 100`, bounding the result to 0–100%. |
+| **Active TCP Connections** | `/proc/net/tcp`, `/proc/net/tcp6` | Iterates over each socket entry (ignoring headers) and counts states corresponding to active/half-closed sessions (e.g., `0x01` ESTABLISHED, `0x06` TIME_WAIT, `0x08` CLOSE_WAIT). IPv4 and IPv6 counts are summed. |
+| **Disk Usage (%)** | `statvfs("/")` | Invokes POSIX `statvfs` on the root filesystem and calculates `(totalBytes − availableBytes) / totalBytes × 100` from block counts and block size. |
+| **Network Receive/Transmit (KiB/s)** | `/proc/net/dev` | Aggregates RX/TX byte counters for non-loopback interfaces, compares them with the previous sample, and divides the byte deltas by elapsed seconds × 1024 to yield KiB/s (floored at 0 to suppress negative spikes). |
+| **Load Averages (1/5/15 min)** | `getloadavg` | Delegates to the libc `getloadavg` helper to fetch the kernel-maintained rolling averages, defaulting to zeros when unavailable. |
+| **CPU Core Count** | `std::thread::hardware_concurrency()` | Lazily caches the reported hardware thread count, defaulting to `1` if the platform returns `0`. |
+
+Each payload is timestamped in ISO-8601 UTC form before being forwarded to InfluxDB, Grafana, and the React dashboard.
+
+---
+
 ## 🧩 Running Services Separately
 The project is structured so that you can iterate on the backend or frontend without rebuilding the whole Docker stack. These steps assume you have the prerequisites from the _Running without Docker_ section.
 
