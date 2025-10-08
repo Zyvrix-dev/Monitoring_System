@@ -132,7 +132,34 @@ void WebSocketServer::run() {
                         res.set(beast::http::field::server, BOOST_BEAST_VERSION_STRING " monitoring-service");
                     }));
 
+                    beast::flat_buffer buffer;
                     beast::http::request<beast::http::string_body> req;
+                    beast::http::read(ws.next_layer(), buffer, req);
+
+                    if (req.method() != beast::http::verb::get)
+                    {
+                        beast::http::response<beast::http::string_body> res{beast::http::status::method_not_allowed, req.version()};
+                        res.set(beast::http::field::server, BOOST_BEAST_VERSION_STRING " monitoring-service");
+                        res.set(beast::http::field::content_type, "text/plain");
+                        res.keep_alive(false);
+                        res.body() = "WebSocket handshake must use GET.";
+                        res.prepare_payload();
+                        beast::http::write(ws.next_layer(), res);
+                        return;
+                    }
+
+                    if (!websocket::is_upgrade(req))
+                    {
+                        beast::http::response<beast::http::string_body> res{beast::http::status::bad_request, req.version()};
+                        res.set(beast::http::field::server, BOOST_BEAST_VERSION_STRING " monitoring-service");
+                        res.set(beast::http::field::content_type, "text/plain");
+                        res.keep_alive(false);
+                        res.body() = "Expected WebSocket upgrade request.";
+                        res.prepare_payload();
+                        beast::http::write(ws.next_layer(), res);
+                        return;
+                    }
+
                     ws.accept(req);
 
                     const auto params = parse_query_string(req.target());
