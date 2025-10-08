@@ -1,14 +1,9 @@
 FROM node:20
 
 WORKDIR /frontend
-
-
 COPY . .
 RUN npm install
-
-RUN npm audit fix --force
-
-RUN test -f public/index.html
+RUN npm run build
 
 ENV HOST=0.0.0.0
 
