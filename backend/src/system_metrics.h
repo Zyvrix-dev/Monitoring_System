@@ -15,6 +15,7 @@ struct ApplicationUsage
     std::string name;
     double cpuPercent;
     double memoryMb;
+    std::string commandLine;
 };
 
 struct DomainUsage
@@ -31,6 +32,15 @@ struct DockerContainerSummary
     std::string name;
     std::string image;
     std::string status;
+    double cpuPercent;
+    double memoryUsageMb;
+    double memoryLimitMb;
+    double memoryPercent;
+    double networkRxKb;
+    double networkTxKb;
+    double blockReadKb;
+    double blockWriteKb;
+    unsigned int pids;
 };
 
 struct DockerImageSummary
