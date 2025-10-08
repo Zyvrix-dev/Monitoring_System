@@ -17,6 +17,13 @@ export const formatConnections = (value) => {
   return Number(value).toLocaleString();
 };
 
+export const formatCount = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '--';
+  }
+  return Number(value).toLocaleString();
+};
+
 export const formatLoad = (value) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -79,6 +86,13 @@ export const formatMegabytes = (value) => {
     return `${(numeric / 1024).toFixed(2)} GB`;
   }
   return `${numeric.toFixed(1)} MB`;
+};
+
+export const formatBoolean = (value) => {
+  if (value === null || value === undefined) {
+    return '--';
+  }
+  return value ? 'Yes' : 'No';
 };
 
 const normaliseDate = (value) => {

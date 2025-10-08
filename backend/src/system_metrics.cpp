@@ -5,9 +5,12 @@
 #include <cmath>
 #include <cctype>
 #include <cstdlib>
+#include <cstdio>
+#include <cstring>
 #include <exception>
 #include <fstream>
 #include <iomanip>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -20,6 +23,9 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/statvfs.h>
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 #include <unistd.h>
 
 namespace
@@ -28,7 +34,12 @@ constexpr const char *PROC_STAT_PATH = "/proc/stat";
 constexpr const char *PROC_MEMINFO_PATH = "/proc/meminfo";
 constexpr const char *PROC_TCP4_PATH = "/proc/net/tcp";
 constexpr const char *PROC_TCP6_PATH = "/proc/net/tcp6";
+constexpr const char *PROC_UDP4_PATH = "/proc/net/udp";
+constexpr const char *PROC_UDP6_PATH = "/proc/net/udp6";
 constexpr const char *PROC_NET_DEV_PATH = "/proc/net/dev";
+constexpr auto CPU_AVERAGE_WINDOW = std::chrono::seconds(60);
+constexpr auto NETWORK_AVERAGE_WINDOW = std::chrono::seconds(30);
+constexpr auto MIN_COLLECTION_INTERVAL = std::chrono::milliseconds(400);
 bool is_active_tcp_state(int state)
 {
     switch (state)
@@ -113,15 +124,6 @@ std::string decode_ipv6_address(const std::string &hex)
     return buffer;
 }
 
-std::string format_domain_label(const std::string &address)
-{
-    if (address == "unknown")
-    {
-        return "unresolved";
-    }
-    return address;
-}
-
 } // namespace
 
 MetricsCollector::MetricsCollector()
@@ -135,7 +137,14 @@ MetricsCollector::MetricsCollector()
       network_initialized_(false),
       previous_rx_bytes_(0),
       previous_tx_bytes_(0),
-      has_cached_sample_(false)
+      has_cached_sample_(false),
+      last_collection_time_(),
+      cached_metrics_(),
+      process_cpu_times_(),
+      cpu_samples_(),
+      rx_samples_(),
+      tx_samples_(),
+      dns_cache_()
 {
 }
 
@@ -147,7 +156,7 @@ SystemMetrics MetricsCollector::collect()
     if (has_cached_sample_)
     {
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_collection_time_);
-        if (elapsed.count() < 900)
+        if (elapsed < MIN_COLLECTION_INTERVAL)
         {
             return cached_metrics_;
         }
@@ -157,6 +166,7 @@ SystemMetrics MetricsCollector::collect()
     metrics.timestamp = std::chrono::system_clock::now();
     metrics.cpuUsage = read_cpu_usage();
     metrics.memoryUsage = read_memory_usage();
+    metrics.swapUsage = read_swap_usage();
     metrics.diskUsage = read_disk_usage();
     auto [rx_rate, tx_rate] = read_network_throughput();
     metrics.networkReceiveRate = rx_rate;
@@ -166,10 +176,27 @@ SystemMetrics MetricsCollector::collect()
     metrics.loadAverage5 = load_avgs[1];
     metrics.loadAverage15 = load_avgs[2];
     metrics.cpuCount = detect_cpu_count();
+    auto [processes, threads] = read_process_thread_counts();
+    metrics.processCount = processes;
+    metrics.threadCount = threads;
+    auto [listeningTcp, listeningUdp] = read_listening_ports();
+    metrics.listeningTcp = listeningTcp;
+    metrics.listeningUdp = listeningUdp;
+    metrics.openFileDescriptors = read_open_file_descriptors();
     auto connectionSummary = read_connection_summary();
     metrics.activeConnections = connectionSummary.totalConnections;
     metrics.domainUsage = build_domain_usage(connectionSummary, metrics.networkReceiveRate, metrics.networkTransmitRate);
+    metrics.uniqueDomains = metrics.domainUsage.size();
     metrics.topApplications = read_application_usage();
+    update_rollup_samples(metrics.cpuUsage, metrics.networkReceiveRate, metrics.networkTransmitRate, now);
+    metrics.cpuUsageAverage = compute_average(cpu_samples_, now, CPU_AVERAGE_WINDOW);
+    metrics.networkReceiveRateAverage = compute_average(rx_samples_, now, NETWORK_AVERAGE_WINDOW);
+    metrics.networkTransmitRateAverage = compute_average(tx_samples_, now, NETWORK_AVERAGE_WINDOW);
+    bool docker_available = false;
+    auto [containers, images] = read_docker_inventory(docker_available);
+    metrics.dockerAvailable = docker_available;
+    metrics.dockerContainers = std::move(containers);
+    metrics.dockerImages = std::move(images);
 
     cached_metrics_ = metrics;
     last_collection_time_ = now;
@@ -266,6 +293,47 @@ double MetricsCollector::read_memory_usage()
 
     const double used = static_cast<double>(mem_total - mem_available);
     const double usage = (used / static_cast<double>(mem_total)) * 100.0;
+    return std::clamp(usage, 0.0, 100.0);
+}
+
+double MetricsCollector::read_swap_usage()
+{
+    std::ifstream meminfo(PROC_MEMINFO_PATH);
+    if (!meminfo.is_open())
+    {
+        return 0.0;
+    }
+
+    unsigned long long swap_total = 0;
+    unsigned long long swap_free = 0;
+    std::string key;
+    unsigned long long value = 0;
+    std::string unit;
+
+    while (meminfo >> key >> value >> unit)
+    {
+        if (key == "SwapTotal:")
+        {
+            swap_total = value;
+        }
+        else if (key == "SwapFree:")
+        {
+            swap_free = value;
+        }
+
+        if (swap_total != 0 && swap_free != 0)
+        {
+            break;
+        }
+    }
+
+    if (swap_total == 0)
+    {
+        return 0.0;
+    }
+
+    const double used = static_cast<double>(swap_total - swap_free);
+    const double usage = (used / static_cast<double>(swap_total)) * 100.0;
     return std::clamp(usage, 0.0, 100.0);
 }
 
@@ -366,6 +434,49 @@ std::tuple<double, double> MetricsCollector::read_network_throughput()
     previous_tx_bytes_ = tx_total;
 
     return {std::max(0.0, rx_rate), std::max(0.0, tx_rate)};
+}
+
+void MetricsCollector::update_rollup_samples(double cpu, double rx, double tx, const std::chrono::steady_clock::time_point &now)
+{
+    auto push_sample = [&now](std::deque<std::pair<std::chrono::steady_clock::time_point, double>> &samples,
+                              double value,
+                              const std::chrono::steady_clock::duration &window) {
+        if (!std::isfinite(value))
+        {
+            return;
+        }
+
+        samples.emplace_back(now, value);
+        while (!samples.empty() && (now - samples.front().first) > window)
+        {
+            samples.pop_front();
+        }
+    };
+
+    push_sample(cpu_samples_, cpu, CPU_AVERAGE_WINDOW);
+    push_sample(rx_samples_, rx, NETWORK_AVERAGE_WINDOW);
+    push_sample(tx_samples_, tx, NETWORK_AVERAGE_WINDOW);
+}
+
+double MetricsCollector::compute_average(std::deque<std::pair<std::chrono::steady_clock::time_point, double>> &samples,
+                                         const std::chrono::steady_clock::time_point &now,
+                                         const std::chrono::steady_clock::duration &window) const
+{
+    while (!samples.empty() && (now - samples.front().first) > window)
+    {
+        samples.pop_front();
+    }
+
+    if (samples.empty())
+    {
+        return 0.0;
+    }
+
+    const double sum = std::accumulate(samples.begin(), samples.end(), 0.0,
+                                       [](double total, const auto &entry) {
+                                           return total + entry.second;
+                                       });
+    return sum / static_cast<double>(samples.size());
 }
 
 std::vector<ApplicationUsage> MetricsCollector::read_application_usage()
@@ -482,6 +593,288 @@ std::vector<ApplicationUsage> MetricsCollector::read_application_usage()
     return result;
 }
 
+std::pair<unsigned int, unsigned int> MetricsCollector::read_process_thread_counts()
+{
+    DIR *proc_dir = opendir("/proc");
+    if (proc_dir == nullptr)
+    {
+        return {0U, 0U};
+    }
+
+    unsigned int process_count = 0;
+    unsigned int thread_count = 0;
+    struct dirent *entry = nullptr;
+
+    while ((entry = readdir(proc_dir)) != nullptr)
+    {
+        if (entry->d_name == nullptr || !std::isdigit(static_cast<unsigned char>(entry->d_name[0])))
+        {
+            continue;
+        }
+
+        ++process_count;
+
+        const std::string status_path = std::string("/proc/") + entry->d_name + "/status";
+        std::ifstream status_file(status_path);
+        if (!status_file.is_open())
+        {
+            continue;
+        }
+
+        std::string line;
+        while (std::getline(status_file, line))
+        {
+            if (line.rfind("Threads:", 0) == 0)
+            {
+                std::istringstream ss(line.substr(8));
+                unsigned int threads = 0;
+                ss >> threads;
+                thread_count += threads;
+                break;
+            }
+        }
+    }
+
+    closedir(proc_dir);
+    return {process_count, thread_count};
+}
+
+std::pair<unsigned int, unsigned int> MetricsCollector::read_listening_ports() const
+{
+    auto count_listening = [](const std::string &path, bool tcp) {
+        std::ifstream file(path);
+        if (!file.is_open())
+        {
+            return 0U;
+        }
+
+        std::string line;
+        std::getline(file, line);
+        unsigned int count = 0;
+
+        while (std::getline(file, line))
+        {
+            if (line.empty())
+            {
+                continue;
+            }
+
+            std::istringstream ss(line);
+            std::string sl;
+            std::string local_address;
+            std::string rem_address;
+            std::string state_hex;
+
+            if (!(ss >> sl >> local_address >> rem_address >> state_hex))
+            {
+                continue;
+            }
+
+            int state = 0;
+            try
+            {
+                state = std::stoi(state_hex, nullptr, 16);
+            }
+            catch (const std::exception &)
+            {
+                continue;
+            }
+
+            if (tcp)
+            {
+                if (state == 0x0A)
+                {
+                    ++count;
+                }
+            }
+            else
+            {
+                if (state == 0x07)
+                {
+                    ++count;
+                }
+            }
+        }
+
+        return count;
+    };
+
+    const unsigned int tcp4 = count_listening(PROC_TCP4_PATH, true);
+    const unsigned int tcp6 = count_listening(PROC_TCP6_PATH, true);
+    const unsigned int udp4 = count_listening(PROC_UDP4_PATH, false);
+    const unsigned int udp6 = count_listening(PROC_UDP6_PATH, false);
+
+    return {tcp4 + tcp6, udp4 + udp6};
+}
+
+unsigned long MetricsCollector::read_open_file_descriptors() const
+{
+    std::ifstream file("/proc/sys/fs/file-nr");
+    if (!file.is_open())
+    {
+        return 0UL;
+    }
+
+    unsigned long allocated = 0UL;
+    unsigned long unused = 0UL;
+    unsigned long max = 0UL;
+    file >> allocated >> unused >> max;
+    if (!file)
+    {
+        return 0UL;
+    }
+
+    return allocated - unused;
+}
+
+std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> MetricsCollector::read_docker_inventory(bool &available) const
+{
+    available = false;
+    std::vector<DockerContainerSummary> containers;
+    std::vector<DockerImageSummary> images;
+
+    auto run_command = [](const char *cmd, std::vector<std::string> &lines) -> bool {
+        FILE *pipe = popen(cmd, "r");
+        if (pipe == nullptr)
+        {
+            return false;
+        }
+
+        char buffer[512];
+        while (fgets(buffer, sizeof(buffer), pipe) != nullptr)
+        {
+            std::string line(buffer);
+            if (!line.empty() && line.back() == '\n')
+            {
+                line.pop_back();
+            }
+            lines.push_back(std::move(line));
+        }
+
+        const int status = pclose(pipe);
+        if (status == -1)
+        {
+            return false;
+        }
+
+#ifndef _WIN32
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        {
+            return true;
+        }
+        return false;
+#else
+        return status == 0;
+#endif
+    };
+
+    std::vector<std::string> container_lines;
+    if (run_command("docker ps --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}'", container_lines))
+    {
+        available = true;
+        for (const auto &line : container_lines)
+        {
+            std::array<std::string, 4> parts{};
+            std::size_t start = 0;
+            std::size_t part_index = 0;
+            for (std::size_t i = 0; i <= line.size() && part_index < parts.size(); ++i)
+            {
+                if (i == line.size() || line[i] == '|')
+                {
+                    parts[part_index++] = line.substr(start, i - start);
+                    start = i + 1;
+                }
+            }
+
+            DockerContainerSummary summary{};
+            summary.id = parts[0];
+            summary.name = parts[1].empty() ? parts[0] : parts[1];
+            summary.image = parts[2];
+            summary.status = parts[3];
+            containers.push_back(std::move(summary));
+        }
+    }
+
+    std::vector<std::string> image_lines;
+    if (run_command("docker images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.Size}}'", image_lines))
+    {
+        available = true;
+        for (const auto &line : image_lines)
+        {
+            std::array<std::string, 4> parts{};
+            std::size_t start = 0;
+            std::size_t part_index = 0;
+            for (std::size_t i = 0; i <= line.size() && part_index < parts.size(); ++i)
+            {
+                if (i == line.size() || line[i] == '|')
+                {
+                    parts[part_index++] = line.substr(start, i - start);
+                    start = i + 1;
+                }
+            }
+
+            DockerImageSummary image{};
+            image.repository = parts[0];
+            image.tag = parts[1];
+            image.id = parts[2];
+            image.size = parts[3];
+            images.push_back(std::move(image));
+        }
+    }
+
+    return {containers, images};
+}
+
+std::string MetricsCollector::resolve_hostname(const std::string &address, bool ipv6)
+{
+    if (address.empty() || address == "unknown")
+    {
+        return "unresolved";
+    }
+
+    const std::string cache_key = (ipv6 ? std::string("6|") : std::string("4|")) + address;
+    const auto it = dns_cache_.find(cache_key);
+    if (it != dns_cache_.end())
+    {
+        return it->second;
+    }
+
+    char host[NI_MAXHOST];
+    int result = -1;
+
+    if (ipv6)
+    {
+        sockaddr_in6 sa{};
+        sa.sin6_family = AF_INET6;
+        if (inet_pton(AF_INET6, address.c_str(), &sa.sin6_addr) == 1)
+        {
+            result = getnameinfo(reinterpret_cast<sockaddr *>(&sa), sizeof(sa), host, sizeof(host), nullptr, 0, NI_NAMEREQD);
+        }
+    }
+    else
+    {
+        sockaddr_in sa{};
+        sa.sin_family = AF_INET;
+        if (inet_pton(AF_INET, address.c_str(), &sa.sin_addr) == 1)
+        {
+            result = getnameinfo(reinterpret_cast<sockaddr *>(&sa), sizeof(sa), host, sizeof(host), nullptr, 0, NI_NAMEREQD);
+        }
+    }
+
+    std::string resolved;
+    if (result == 0)
+    {
+        resolved = host;
+    }
+    else
+    {
+        resolved = address;
+    }
+
+    dns_cache_[cache_key] = resolved;
+    return resolved;
+}
+
 MetricsCollector::ConnectionSummary MetricsCollector::read_connection_summary()
 {
     ConnectionSummary summary{};
@@ -537,8 +930,8 @@ MetricsCollector::ConnectionSummary MetricsCollector::read_connection_summary()
             }
 
             const std::string remote_hex = rem_address.substr(0, colon_pos);
-            std::string domain = ipv6 ? decode_ipv6_address(remote_hex) : decode_ipv4_address(remote_hex);
-            domain = format_domain_label(domain);
+            std::string address = ipv6 ? decode_ipv6_address(remote_hex) : decode_ipv4_address(remote_hex);
+            std::string domain = resolve_hostname(address, ipv6);
 
             ++summary.domainCounts[domain];
             ++summary.totalConnections;

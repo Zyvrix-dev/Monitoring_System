@@ -5,6 +5,7 @@ import {
   formatCpuCores,
   formatLoad,
   formatLoadPerCore,
+  formatPercent,
   formatPercentLabel,
   formatThroughput
 } from '../utils/formatters';
@@ -74,6 +75,60 @@ function PerformanceSummary({ latestMetric, stats }) {
               <td>{stats.netTx?.peak !== null ? formatThroughput(stats.netTx.peak) : '--'}</td>
             </tr>
             <tr>
+              <th scope="row">Avg net in (30s)</th>
+              <td>{formatThroughput(latestMetric?.netRxAvg)}</td>
+              <td>{stats.netRxAvg?.avg !== null ? formatThroughput(stats.netRxAvg.avg) : '--'}</td>
+              <td>{stats.netRxAvg?.peak !== null ? formatThroughput(stats.netRxAvg.peak) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Avg net out (30s)</th>
+              <td>{formatThroughput(latestMetric?.netTxAvg)}</td>
+              <td>{stats.netTxAvg?.avg !== null ? formatThroughput(stats.netTxAvg.avg) : '--'}</td>
+              <td>{stats.netTxAvg?.peak !== null ? formatThroughput(stats.netTxAvg.peak) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Swap</th>
+              <td>{formatPercentLabel(latestMetric?.swap)}</td>
+              <td>{stats.swap?.avg !== null ? formatPercentLabel(stats.swap.avg) : '--'}</td>
+              <td>{stats.swap?.peak !== null ? formatPercentLabel(stats.swap.peak) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Processes</th>
+              <td>{formatConnections(latestMetric?.processes)}</td>
+              <td>{stats.processes?.avg !== null ? formatConnections(Math.round(stats.processes.avg)) : '--'}</td>
+              <td>{stats.processes?.peak !== null ? formatConnections(Math.round(stats.processes.peak)) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Threads</th>
+              <td>{formatConnections(latestMetric?.threads)}</td>
+              <td>{stats.threads?.avg !== null ? formatConnections(Math.round(stats.threads.avg)) : '--'}</td>
+              <td>{stats.threads?.peak !== null ? formatConnections(Math.round(stats.threads.peak)) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Listening TCP</th>
+              <td>{formatConnections(latestMetric?.listeningTcp)}</td>
+              <td>{stats.listeningTcp?.avg !== null ? formatConnections(Math.round(stats.listeningTcp.avg)) : '--'}</td>
+              <td>{stats.listeningTcp?.peak !== null ? formatConnections(Math.round(stats.listeningTcp.peak)) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Listening UDP</th>
+              <td>{formatConnections(latestMetric?.listeningUdp)}</td>
+              <td>{stats.listeningUdp?.avg !== null ? formatConnections(Math.round(stats.listeningUdp.avg)) : '--'}</td>
+              <td>{stats.listeningUdp?.peak !== null ? formatConnections(Math.round(stats.listeningUdp.peak)) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Open file descriptors</th>
+              <td>{formatConnections(latestMetric?.openFds)}</td>
+              <td>{stats.openFds?.avg !== null ? formatConnections(Math.round(stats.openFds.avg)) : '--'}</td>
+              <td>{stats.openFds?.peak !== null ? formatConnections(Math.round(stats.openFds.peak)) : '--'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Unique domains</th>
+              <td>{formatConnections(latestMetric?.uniqueDomains)}</td>
+              <td>{stats.uniqueDomains?.avg !== null ? formatConnections(Math.round(stats.uniqueDomains.avg)) : '--'}</td>
+              <td>{stats.uniqueDomains?.peak !== null ? formatConnections(Math.round(stats.uniqueDomains.peak)) : '--'}</td>
+            </tr>
+            <tr>
               <th scope="row">Load 1m</th>
               <td>{formatLoad(latestMetric?.load1)}</td>
               <td>{stats.load1?.avg !== null ? formatLoad(stats.load1.avg) : '--'}</td>
@@ -109,6 +164,18 @@ function PerformanceSummary({ latestMetric, stats }) {
             <p className="insights-meta__value">
               {formatLoadPerCore(latestMetric?.load5, latestMetric?.cpuCores)}
             </p>
+          </div>
+          <div className="insights-meta__item" role="listitem">
+            <p className="insights-meta__label">Docker containers</p>
+            <p className="insights-meta__value">
+              {latestMetric?.dockerAvailable
+                ? `${formatConnections(latestMetric?.dockerContainers?.length ?? 0)} running`
+                : 'Unavailable'}
+            </p>
+          </div>
+          <div className="insights-meta__item" role="listitem">
+            <p className="insights-meta__label">30s CPU average</p>
+            <p className="insights-meta__value">{formatPercent(latestMetric?.cpuAvg)}%</p>
           </div>
         </div>
       </div>

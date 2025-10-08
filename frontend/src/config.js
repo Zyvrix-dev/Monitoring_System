@@ -1,5 +1,5 @@
 const rawMaxPoints = Number(process.env.REACT_APP_MAX_POINTS || 180);
-const rawSampleInterval = Number(process.env.REACT_APP_SAMPLE_INTERVAL_SECONDS || 1);
+const rawSampleInterval = Number(process.env.REACT_APP_SAMPLE_INTERVAL_SECONDS || 0.5);
 const rawRetentionDays = Number(process.env.REACT_APP_DEFAULT_RETENTION_DAYS || 7);
 
 const sampleIntervalSeconds = Number.isFinite(rawSampleInterval) && rawSampleInterval > 0 ? rawSampleInterval : 1;
