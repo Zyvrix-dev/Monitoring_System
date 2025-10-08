@@ -58,6 +58,32 @@ void RestServer::handle_get(web::http::http_request request)
     response[utility::conversions::to_string_t("cpuCores")] = web::json::value::number(m.cpuCount);
     response[utility::conversions::to_string_t("timestamp")] = web::json::value::string(utility::conversions::to_string_t(MetricsCollector::to_iso8601(m.timestamp)));
 
+    web::json::value applications = web::json::value::array(m.topApplications.size());
+    for (std::size_t i = 0; i < m.topApplications.size(); ++i)
+    {
+        const auto &app = m.topApplications[i];
+        web::json::value item;
+        item[utility::conversions::to_string_t("pid")] = web::json::value::number(app.pid);
+        item[utility::conversions::to_string_t("name")] = web::json::value::string(utility::conversions::to_string_t(app.name));
+        item[utility::conversions::to_string_t("cpu")] = web::json::value::number(app.cpuPercent);
+        item[utility::conversions::to_string_t("memoryMb")] = web::json::value::number(app.memoryMb);
+        applications[i] = std::move(item);
+    }
+    response[utility::conversions::to_string_t("applications")] = std::move(applications);
+
+    web::json::value domains = web::json::value::array(m.domainUsage.size());
+    for (std::size_t i = 0; i < m.domainUsage.size(); ++i)
+    {
+        const auto &domain = m.domainUsage[i];
+        web::json::value item;
+        item[utility::conversions::to_string_t("domain")] = web::json::value::string(utility::conversions::to_string_t(domain.domain));
+        item[utility::conversions::to_string_t("receiveRate")] = web::json::value::number(domain.receiveRate);
+        item[utility::conversions::to_string_t("transmitRate")] = web::json::value::number(domain.transmitRate);
+        item[utility::conversions::to_string_t("connections")] = web::json::value::number(domain.connections);
+        domains[i] = std::move(item);
+    }
+    response[utility::conversions::to_string_t("domains")] = std::move(domains);
+
     web::http::http_response httpResponse(web::http::status_codes::OK);
     httpResponse.headers().add(web::http::header_names::cache_control, utility::conversions::to_string_t("no-store"));
     httpResponse.headers().add(web::http::header_names::content_type, utility::conversions::to_string_t("application/json"));

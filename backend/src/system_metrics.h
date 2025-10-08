@@ -4,8 +4,25 @@
 #include <tuple>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
+
+struct ApplicationUsage
+{
+    int pid;
+    std::string name;
+    double cpuPercent;
+    double memoryMb;
+};
+
+struct DomainUsage
+{
+    std::string domain;
+    double receiveRate;
+    double transmitRate;
+    int connections;
+};
 
 struct SystemMetrics
 {
@@ -20,6 +37,8 @@ struct SystemMetrics
     double networkTransmitRate; // Outbound network throughput in KB/s
     unsigned int cpuCount;     // Number of logical CPU cores
     std::chrono::system_clock::time_point timestamp; // Collection time
+    std::vector<ApplicationUsage> topApplications;    // Top processes by utilisation
+    std::vector<DomainUsage> domainUsage;             // Aggregated network usage per domain
 };
 
 class MetricsCollector
@@ -31,10 +50,17 @@ public:
     static std::string to_iso8601(const std::chrono::system_clock::time_point &timePoint);
 
 private:
+    struct ConnectionSummary
+    {
+        int totalConnections;
+        std::unordered_map<std::string, int> domainCounts;
+    };
+
     double read_cpu_usage();
     double read_memory_usage();
-    int read_active_connections();
-    int count_connections_from_proc(const std::string &path);
+    std::vector<ApplicationUsage> read_application_usage();
+    ConnectionSummary read_connection_summary();
+    std::vector<DomainUsage> build_domain_usage(const ConnectionSummary &summary, double totalRx, double totalTx) const;
     double read_disk_usage();
     std::tuple<double, double> read_network_throughput();
     std::array<double, 3> read_load_averages() const;
@@ -45,6 +71,7 @@ private:
     bool cpu_initialized_;
     unsigned long long previous_total_;
     unsigned long long previous_idle_;
+    unsigned long long last_cpu_total_diff_;
     bool cpu_count_cached_;
     unsigned int cached_cpu_count_;
     bool network_initialized_;
@@ -54,4 +81,5 @@ private:
     bool has_cached_sample_;
     std::chrono::steady_clock::time_point last_collection_time_;
     SystemMetrics cached_metrics_;
+    std::unordered_map<int, unsigned long long> process_cpu_times_;
 };

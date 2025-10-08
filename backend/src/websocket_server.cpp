@@ -203,6 +203,26 @@ void WebSocketServer::run() {
                         j["netTx"] = m.networkTransmitRate;
                         j["cpuCores"] = m.cpuCount;
                         j["timestamp"] = MetricsCollector::to_iso8601(m.timestamp);
+                        j["applications"] = nlohmann::json::array();
+                        for (const auto &app : m.topApplications)
+                        {
+                            j["applications"].push_back({
+                                {"pid", app.pid},
+                                {"name", app.name},
+                                {"cpu", app.cpuPercent},
+                                {"memoryMb", app.memoryMb}
+                            });
+                        }
+                        j["domains"] = nlohmann::json::array();
+                        for (const auto &domain : m.domainUsage)
+                        {
+                            j["domains"].push_back({
+                                {"domain", domain.domain},
+                                {"receiveRate", domain.receiveRate},
+                                {"transmitRate", domain.transmitRate},
+                                {"connections", domain.connections}
+                            });
+                        }
 
                         ws.write(net::buffer(j.dump()));
                         std::this_thread::sleep_for(std::chrono::seconds(1));

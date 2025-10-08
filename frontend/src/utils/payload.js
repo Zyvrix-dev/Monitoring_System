@@ -1,3 +1,38 @@
+const normaliseApplications = (rawApplications) => {
+  if (!Array.isArray(rawApplications)) {
+    return [];
+  }
+
+  return rawApplications
+    .map((app) => {
+      const pid = Number(app?.pid ?? app?.processId ?? app?.id);
+      const cpu = Number(app?.cpu ?? app?.cpuPercent ?? app?.cpuUsage ?? 0);
+      const memoryMb = Number(app?.memoryMb ?? app?.memory ?? app?.memoryUsage ?? 0);
+      return {
+        pid: Number.isFinite(pid) ? pid : 0,
+        name: String(app?.name ?? app?.process ?? `PID ${pid}`),
+        cpu,
+        memoryMb
+      };
+    })
+    .filter((app) => app.name);
+};
+
+const normaliseDomains = (rawDomains) => {
+  if (!Array.isArray(rawDomains)) {
+    return [];
+  }
+
+  return rawDomains
+    .map((domain) => ({
+      domain: String(domain?.domain ?? domain?.host ?? domain?.address ?? 'unresolved'),
+      connections: Number(domain?.connections ?? domain?.count ?? 0),
+      receiveRate: Number(domain?.receiveRate ?? domain?.inbound ?? 0),
+      transmitRate: Number(domain?.transmitRate ?? domain?.outbound ?? 0)
+    }))
+    .filter((item) => item.domain);
+};
+
 export const normaliseMetricPayload = (payload) => {
   const timestampIso = payload.timestamp || payload.time || new Date().toISOString();
   let sampleDate = new Date(timestampIso);
@@ -16,6 +51,8 @@ export const normaliseMetricPayload = (payload) => {
     netRx: Number(payload.netRx ?? payload.networkReceiveRate ?? 0),
     netTx: Number(payload.netTx ?? payload.networkTransmitRate ?? 0),
     cpuCores: Number(payload.cpuCores ?? payload.cpuCount ?? 0),
+    applications: normaliseApplications(payload.applications ?? payload.topApplications),
+    domains: normaliseDomains(payload.domains ?? payload.domainUsage),
     time: sampleDate.toLocaleTimeString([], {
       hour12: false,
       hour: '2-digit',
