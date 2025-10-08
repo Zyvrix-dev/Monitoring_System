@@ -83,6 +83,19 @@ Each payload is timestamped in ISO-8601 UTC form before being forwarded to Influ
 
 ---
 
+## ❓ FAQ
+
+### Why do the numbers differ from Task Manager or other monitoring tools?
+
+- **Different sampling windows** – This agent only emits a new sample roughly every 900 ms and reuses the cached snapshot in between requests, whereas other tools can poll faster or average data across longer windows. Short spikes can therefore show up in one tool but not the other.【F:README.md†L73-L104】【F:backend/src/system_metrics.cpp†L90-L135】
+- **Kernel level vs. UI level metrics** – The backend reads raw counters from `/proc` and calculates deltas itself (for example CPU usage comes from the aggregated `cpu` line in `/proc/stat`). Desktop task managers often combine additional heuristics, such as per-core graphs, scheduler smoothing, or GPU usage, so their totals may not match the Linux kernel values shown here.【F:README.md†L73-L104】【F:backend/src/system_metrics.cpp†L135-L209】
+- **Scope of measurement** – The project reports aggregated statistics for the environment where the backend is running by iterating over every `/proc` process, TCP socket, and network interface it can see. If you run the agent inside a container or VM, it will honour that sandbox’s namespaces, whereas a desktop Task Manager may show host-level utilisation (or vice versa).【F:backend/src/system_metrics.cpp†L142-L483】
+- **Unit and rounding differences** – Memory is computed using `MemTotal`/`MemAvailable` and network throughput is derived from byte deltas divided by seconds × 1024. Other tools may use powers-of-ten units, include cached/buffered memory, or display instantaneous byte counters without normalising to KiB/s.【F:README.md†L73-L104】【F:backend/src/system_metrics.cpp†L209-L266】
+
+If consistent numbers are required, ensure all tools poll the same environment with comparable sampling intervals and unit conventions.
+
+---
+
 ## 🧩 Running Services Separately
 The project is structured so that you can iterate on the backend or frontend without rebuilding the whole Docker stack. These steps assume you have the prerequisites from the _Running without Docker_ section.
 
