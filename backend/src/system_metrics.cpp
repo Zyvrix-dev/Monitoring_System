@@ -10,6 +10,7 @@
 #include <exception>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -571,7 +572,36 @@ std::vector<ApplicationUsage> MetricsCollector::read_application_usage()
             }
         }
 
-        ApplicationUsage usage{pid, name, cpuPercent, memoryMb};
+        std::string commandLine;
+        {
+            std::ifstream cmdline_file(base_path + "/cmdline", std::ios::in | std::ios::binary);
+            if (cmdline_file.is_open())
+            {
+                std::string raw((std::istreambuf_iterator<char>(cmdline_file)), std::istreambuf_iterator<char>());
+                cmdline_file.close();
+
+                for (char &ch : raw)
+                {
+                    if (ch == '\0')
+                    {
+                        ch = ' ';
+                    }
+                }
+
+                std::size_t first_non_space = raw.find_first_not_of(' ');
+                if (first_non_space != std::string::npos)
+                {
+                    commandLine = raw.substr(first_non_space);
+                }
+            }
+        }
+
+        if (commandLine.empty())
+        {
+            commandLine = name;
+        }
+
+        ApplicationUsage usage{pid, name, cpuPercent, memoryMb, commandLine};
         result.push_back(std::move(usage));
     }
 
@@ -768,6 +798,115 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
 #endif
     };
 
+    auto trim = [](const std::string &value) -> std::string {
+        const char *whitespace = " \t\r\n";
+        const std::size_t begin = value.find_first_not_of(whitespace);
+        if (begin == std::string::npos)
+        {
+            return std::string();
+        }
+        const std::size_t end = value.find_last_not_of(whitespace);
+        return value.substr(begin, end - begin + 1);
+    };
+
+    auto parse_percent = [](const std::string &value) -> double {
+        std::string trimmed = value;
+        trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), [](unsigned char ch) { return std::isspace(ch); }), trimmed.end());
+        if (!trimmed.empty() && trimmed.back() == '%')
+        {
+            trimmed.pop_back();
+        }
+        if (trimmed.empty())
+        {
+            return 0.0;
+        }
+        try
+        {
+            return std::stod(trimmed);
+        }
+        catch (const std::exception &)
+        {
+            return 0.0;
+        }
+    };
+
+    auto parse_bytes = [&trim](const std::string &value) -> double {
+        std::string trimmed = trim(value);
+        if (trimmed.empty() || trimmed == "--")
+        {
+            return 0.0;
+        }
+
+        std::size_t index = 0;
+        while (index < trimmed.size() && (std::isdigit(static_cast<unsigned char>(trimmed[index])) || trimmed[index] == '.'))
+        {
+            ++index;
+        }
+
+        if (index == 0)
+        {
+            return 0.0;
+        }
+
+        double numeric = 0.0;
+        try
+        {
+            numeric = std::stod(trimmed.substr(0, index));
+        }
+        catch (const std::exception &)
+        {
+            return 0.0;
+        }
+
+        std::string unit = trim(trimmed.substr(index));
+        std::transform(unit.begin(), unit.end(), unit.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+        if (unit.empty() || unit == "b")
+        {
+            return numeric;
+        }
+        if (unit == "kb" || unit == "kib")
+        {
+            return numeric * 1024.0;
+        }
+        if (unit == "mb" || unit == "mib")
+        {
+            return numeric * 1024.0 * 1024.0;
+        }
+        if (unit == "gb" || unit == "gib")
+        {
+            return numeric * 1024.0 * 1024.0 * 1024.0;
+        }
+        if (unit == "tb" || unit == "tib")
+        {
+            return numeric * 1024.0 * 1024.0 * 1024.0 * 1024.0;
+        }
+
+        return numeric;
+    };
+
+    auto parse_mb = [&parse_bytes](const std::string &value) -> double {
+        return parse_bytes(value) / (1024.0 * 1024.0);
+    };
+
+    auto parse_kb = [&parse_bytes](const std::string &value) -> double {
+        return parse_bytes(value) / 1024.0;
+    };
+
+    auto parse_io_pair = [&](const std::string &value) -> std::pair<double, double> {
+        const std::size_t slash = value.find('/');
+        if (slash == std::string::npos)
+        {
+            return {parse_kb(value), 0.0};
+        }
+
+        const std::string first = value.substr(0, slash);
+        const std::string second = value.substr(slash + 1);
+        return {parse_kb(first), parse_kb(second)};
+    };
+
+    std::unordered_map<std::string, DockerContainerSummary> container_map;
+
     std::vector<std::string> container_lines;
     if (run_command("docker ps --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}'", container_lines))
     {
@@ -791,9 +930,104 @@ std::pair<std::vector<DockerContainerSummary>, std::vector<DockerImageSummary>> 
             summary.name = parts[1].empty() ? parts[0] : parts[1];
             summary.image = parts[2];
             summary.status = parts[3];
-            containers.push_back(std::move(summary));
+            summary.cpuPercent = 0.0;
+            summary.memoryUsageMb = 0.0;
+            summary.memoryLimitMb = 0.0;
+            summary.memoryPercent = 0.0;
+            summary.networkRxKb = 0.0;
+            summary.networkTxKb = 0.0;
+            summary.blockReadKb = 0.0;
+            summary.blockWriteKb = 0.0;
+            summary.pids = 0U;
+            container_map[summary.id] = std::move(summary);
         }
     }
+
+    std::vector<std::string> stats_lines;
+    if (run_command("docker stats --no-stream --format '{{.ID}}|{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}|{{.PIDs}}'", stats_lines))
+    {
+        available = true;
+        for (const auto &line : stats_lines)
+        {
+            std::array<std::string, 8> parts{};
+            std::size_t start = 0;
+            std::size_t part_index = 0;
+            for (std::size_t i = 0; i <= line.size() && part_index < parts.size(); ++i)
+            {
+                if (i == line.size() || line[i] == '|')
+                {
+                    parts[part_index++] = line.substr(start, i - start);
+                    start = i + 1;
+                }
+            }
+
+            auto iter = container_map.find(parts[0]);
+            if (iter == container_map.end())
+            {
+                DockerContainerSummary summary{};
+                summary.id = parts[0];
+                summary.name = parts[1];
+                summary.image = std::string();
+                summary.status = std::string();
+                summary.cpuPercent = 0.0;
+                summary.memoryUsageMb = 0.0;
+                summary.memoryLimitMb = 0.0;
+                summary.memoryPercent = 0.0;
+                summary.networkRxKb = 0.0;
+                summary.networkTxKb = 0.0;
+                summary.blockReadKb = 0.0;
+                summary.blockWriteKb = 0.0;
+                summary.pids = 0U;
+                iter = container_map.emplace(summary.id, std::move(summary)).first;
+            }
+
+            DockerContainerSummary &summary = iter->second;
+            summary.name = parts[1].empty() ? summary.id : parts[1];
+            summary.cpuPercent = parse_percent(parts[2]);
+
+            const std::size_t slash = parts[3].find('/');
+            if (slash != std::string::npos)
+            {
+                summary.memoryUsageMb = parse_mb(parts[3].substr(0, slash));
+                summary.memoryLimitMb = parse_mb(parts[3].substr(slash + 1));
+            }
+            else
+            {
+                summary.memoryUsageMb = parse_mb(parts[3]);
+            }
+
+            summary.memoryPercent = parse_percent(parts[4]);
+            const auto net_pair = parse_io_pair(parts[5]);
+            summary.networkRxKb = net_pair.first;
+            summary.networkTxKb = net_pair.second;
+            const auto block_pair = parse_io_pair(parts[6]);
+            summary.blockReadKb = block_pair.first;
+            summary.blockWriteKb = block_pair.second;
+
+            try
+            {
+                summary.pids = static_cast<unsigned int>(std::stoul(trim(parts[7])));
+            }
+            catch (const std::exception &)
+            {
+                summary.pids = 0U;
+            }
+        }
+    }
+
+    containers.reserve(container_map.size());
+    for (auto &entry : container_map)
+    {
+        containers.push_back(std::move(entry.second));
+    }
+
+    std::sort(containers.begin(), containers.end(), [](const DockerContainerSummary &lhs, const DockerContainerSummary &rhs) {
+        if (lhs.name != rhs.name)
+        {
+            return lhs.name < rhs.name;
+        }
+        return lhs.id < rhs.id;
+    });
 
     std::vector<std::string> image_lines;
     if (run_command("docker images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.Size}}'", image_lines))
