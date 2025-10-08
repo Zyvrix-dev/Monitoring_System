@@ -16,6 +16,7 @@ import { buildStatistics } from './utils/statistics';
 import DomainTrafficPanel from './components/DomainTrafficPanel';
 import SecurityOverview from './components/SecurityOverview';
 import DockerResourcesPanel from './components/DockerResourcesPanel';
+import OptimizationInsightsPanel from './components/OptimizationInsightsPanel';
 
 function App() {
   const { retentionSeconds, retentionDays, updateSetting } = useSettings();
@@ -111,13 +112,17 @@ function App() {
           />
         </section>
 
-        <section className="panel-grid panel-grid--balanced" aria-label="Security and developer tooling">
+        <section
+          className="panel-grid panel-grid--balanced"
+          aria-label="Security, containers, and optimisation guidance"
+        >
           <SecurityOverview latestMetric={latestMetric} />
           <DockerResourcesPanel
             dockerAvailable={latestMetric?.dockerAvailable}
             containers={latestMetric?.dockerContainers ?? []}
             images={latestMetric?.dockerImages ?? []}
           />
+          <OptimizationInsightsPanel latestMetric={latestMetric} stats={stats} />
         </section>
       </main>
 
